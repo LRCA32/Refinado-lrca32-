@@ -1,0 +1,24 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+
+//@version=6
+indicator("CCI Extremo (© lrca32)", overlay=false)
+
+// Inputs para los tres períodos
+cciLength1 = input.int(9, title="CCI1")
+cciLength2 = input.int(18, title="CCI2")
+cciLength3 = input.int(36, title="CCI3")
+
+// Cálculo de los tres CCI
+cci1 = ta.cci(close, cciLength1)
+cci2 = ta.cci(close, cciLength2)
+cci3 = ta.cci(close, cciLength3)
+
+// Dibujar las líneas de CCI
+plot(cci1, color=color.new(#39FF14, 0), title="CCI1")
+plot(cci2, color=color.new(#007BFF, 0), title="CCI2")
+plot(cci3, color=color.new(#FF00FF, 0), title="CCI3")
+
+// Dibujar los niveles de Oferta/Demanda
+hline(200, color=color.rgb(255, 0, 90), title="Oferta")
+hline(-200, color=color.rgb(0, 140, 255), title="Demanda")
