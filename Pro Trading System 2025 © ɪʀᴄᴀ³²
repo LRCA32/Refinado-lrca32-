@@ -1,0 +1,384 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+
+//@version=6
+indicator("Pro Trading System 2025 © ɪʀᴄᴀ³²", overlay=true)
+
+// ===========================
+// Inputs generales
+// ===========================
+tzInput = "GMT" + input.string("-3", "Zona horaria", options=["-6","-5","-4","-3","-2","-1","0","+1","+2","+3","+4","+5","+6"],tooltip="UTC")
+bgAlpha    = 100
+brdWidth   = 1
+putLabel   = true
+brdStyleOpt = line.style_dotted
+
+// ===========================
+// COLORES CYBERPUNK COMPLETOS
+// ===========================
+colorNeon1 = #FF0033    // Rojo neón
+colorNeon2 = #007BFF    // Azul neón
+colorNeon3 = #FFFF00    // Amarillo neón
+colorNeon4 = #00FF00    // Verde neón
+colorNeon5 = #9B00FF    // Púrpura neón
+colorNeon6 = #FF0739    // Rojo fucsia
+colorNeon7 = #00FFD9    // Cian brillante
+colorNeon8 = #FF00FF    // Magenta neón
+colorNeon9 = #00FFFF    // Cian eléctrico
+colorNeon10 = #FF8C00   // Naranja neón
+
+// ===========================
+// Función para sesiones completas S1–S4
+// ===========================
+drawSessionA(show, sess, name, col, alphaValue, txtColor, textPos="Centro") =>
+    var box b = na
+    var label l = na
+    var float hi = na
+    var float lo = na
+    var int x1 = na
+
+    inSession = not na(time(timeframe.period, sess, tzInput))
+    startCond = ta.change(inSession) and inSession
+    endCond   = ta.change(inSession) and not inSession
+
+    if show and startCond
+        x1 := bar_index
+        hi := high
+        lo := low
+        b := box.new(x1, hi, bar_index, lo, border_color=color.new(col, 0), border_width=brdWidth, border_style=line.style_dashed, bgcolor=color.new(col, alphaValue))
+        if putLabel
+            midX =
+                 textPos == "Centro"   ? math.round((x1 + bar_index) / 2) :
+                 textPos == "Derecha"  ? bar_index :
+                 textPos == "Izquierda"? x1 :
+                 bar_index
+            midY = (hi + lo)/2
+            l := label.new(midX, midY, name, style=textPos=="Izquierda"?label.style_label_center:label.style_label_right, yloc=yloc.belowbar, xloc=xloc.bar_index, textcolor=txtColor, color=color.new(#121213, 100), size= size.normal)
+
+    if show and inSession and not na(b)
+        hi := math.max(hi, high)
+        lo := math.min(lo, low)
+        box.set_top(b, hi)
+        box.set_bottom(b, lo)
+        box.set_right(b, bar_index)
+        if putLabel and not na(l)
+            midX = textPos == "Centro" ? math.round((x1 + bar_index)/2) : bar_index
+            midY = (hi + lo)/2
+            label.set_x(l, midX)
+            label.set_y(l, midY)
+
+    if show and endCond and not na(b)
+        box.set_right(b, bar_index - 1)
+        b := na
+        l := na
+
+// ===========================
+// Sesiones S1–S4 CON COLORES NEON
+// ===========================
+s1_sess = "0400-1300" // Londres
+s2_sess = "0900-1800" // Nueva York
+s3_sess = "2000-0500" // Tokio
+s4_sess = "1900-0400" // Sídney
+
+drawSessionA(true, s1_sess, "Ｌｏｎｄｒｅｓ", color.new(colorNeon5, 0), bgAlpha, colorNeon9)
+drawSessionA(true, s2_sess, "Ｎｕｅｖａ Ｙｏｒｋ", color.new(colorNeon5, 0), bgAlpha, colorNeon9)
+drawSessionA(true, s3_sess, "Ｔｏｋｉｏ", color.new(colorNeon5, 0), bgAlpha, colorNeon9)
+drawSessionA(true, s4_sess, "Ｓíｄｎｅｙ", color.new(colorNeon5, 0), bgAlpha, colorNeon9)
+
+// ===========================
+// Función para S5–S7 CON COLORES NEON
+// ===========================
+drawSessionB(show, sess, name, col, alphaValue, txtColor, textPos="Centro") =>
+    var box b = na
+    var label l = na
+    var float hi = na
+    var float lo = na
+    var int x1 = na
+
+    inSession = not na(time(timeframe.period, sess, tzInput))
+    startCond = ta.change(inSession) and inSession
+    endCond   = ta.change(inSession) and not inSession
+
+    if show and startCond
+        x1 := bar_index
+        hi := high
+        lo := low
+        b := box.new(x1, hi, bar_index, lo, border_color=color.new(col, 0), border_width=brdWidth, border_style=line.style_dashed, bgcolor=color.new(col, alphaValue))
+        if putLabel
+            midX = textPos == "Centro" ? math.round((x1 + bar_index)/2) : bar_index
+            midY = (hi + lo)/2
+            l := label.new(midX, midY, name, style=textPos=="Centro"?label.style_label_center:label.style_label_right, yloc=yloc.belowbar, xloc=xloc.bar_index, textcolor=txtColor, color=color.new(#121213, 100), size= size.normal)
+
+    if show and inSession and not na(b)
+        hi := math.max(hi, high)
+        lo := math.min(lo, low)
+        box.set_top(b, hi)
+        box.set_bottom(b, lo)
+        box.set_right(b, bar_index)
+        if putLabel and not na(l)
+            midX =
+                 textPos == "Centro"   ? math.round((x1 + bar_index) / 2) :
+                 textPos == "Derecha"  ? bar_index :
+                 textPos == "Izquierda"? x1 :
+                 bar_index
+            midY = (hi + lo)/2
+            label.set_x(l, midX)
+            label.set_y(l, midY)
+
+    if show and endCond and not na(b)
+        box.set_right(b, bar_index - 1)
+        b := na
+        l := na
+
+// ===========================
+// Sesiones S5–S7 CON COLORES NEON
+// ===========================
+s5_sess = "0400-0500" // T-L
+s6_sess = "0900-1200" // L-Ny
+s7_sess = "1900-2000" // S-T
+
+drawSessionB(true, s5_sess, "Ｔ-Ｌ", color.new(colorNeon5, 0), 81, colorNeon9)
+drawSessionB(true, s6_sess, "Ｌ-Ｎｙ", color.new(colorNeon5, 0), 70, colorNeon9)
+drawSessionB(true, s7_sess, "Ｓ-Ｔ", color.new(colorNeon5, 0), 81, colorNeon9)
+
+// ===========================
+// Apertura Wall Street CON COLORES NEON
+// ===========================
+nyOpenTime = "1130-1230"
+inSession = not na(time(timeframe.period, nyOpenTime,tzInput))
+startCond = ta.change(inSession) and inSession
+
+// ========================
+// Oferta y Demanda CON COLORES NEON
+// ========================
+periodosOferta  = input.int(3, "Periodos Oferta", minval=1, maxval=50, tooltip="1 y 50")
+periodosDemanda = input.int(3, "Periodos Demanda", minval=1, maxval=50, tooltip="1 y 50")
+
+nivelLiquidacion = "equilibrio"
+mostrarVolumen   = false
+umbralVolumen    = 0.0
+limiteActivas   = input.int(500, "limite Activas", minval=0, maxval=580, tooltip="0 y 580")
+limiteLiquidadas = input.int(3, "limite Liquidadas", minval=0, maxval=250 , tooltip="0 y 250")
+
+colorOferta        = color.new(colorNeon1, 90)
+colorOfertaLiq     = color.new(colorNeon6, 30)
+colorDemanda       = color.new(colorNeon2, 90)
+colorDemandaLiq    = color.new(colorNeon9, 30)
+colorTransparente  = color.new(#ffffff, 100)
+
+// ========================
+// Variables globales
+// ========================
+var array<box> arrayCajaOferta            = array.new_box()
+var array<line> arrayLineaOferta          = array.new_line()
+var array<box> arrayCajaOfertaAnt         = array.new_box()
+var array<line> arrayLineaOfertaAnt       = array.new_line()
+var array<label> arrayEtiquetaOfertaAnt   = array.new_label()
+
+var array<box> arrayCajaDemanda           = array.new_box()
+var array<line> arrayLineaDemanda         = array.new_line()
+var array<box> arrayCajaDemandaAnt        = array.new_box()
+var array<line> arrayLineaDemandaAnt      = array.new_line()
+var array<label> arrayEtiquetaDemandaAnt  = array.new_label()
+
+// ========================
+// Cálculos básicos
+// ========================
+_maximoOferta = ta.highest(high, periodosOferta)
+_minimoDemanda = ta.lowest(low, periodosDemanda)
+
+volumenOferta  = volume
+volumenDemanda = volume
+
+// ========================
+// Detección de OFERTA CON COLORES NEON
+// ========================
+velaDerechaOferta = open[3] < close[3]
+esOferta = velaDerechaOferta and (close[1] < close[2]) and (close[2] < close[3])
+
+if esOferta and nz(ta.barssince(esOferta[1])) > 3
+    cajaOferta = box.new(bar_index[3], _maximoOferta, bar_index, low[3], border_color=colorOfertaLiq, border_width=1, border_style=line.style_solid, extend=extend.right, xloc=xloc.bar_index, bgcolor=colorOferta)
+    array.push(arrayCajaOferta, cajaOferta)
+
+    if mostrarVolumen
+        label.new(bar_index[3], _maximoOferta, str.tostring(volumenOferta, format.percent), xloc=xloc.bar_index, yloc=yloc.price, color=colorTransparente, style=label.style_label_left, textcolor=colorNeon10, size=size.tiny)
+
+    if volumenOferta >= umbralVolumen
+        box.set_bgcolor(cajaOferta, color.new(colorNeon6, 75))
+
+    float liquidacionOferta = switch nivelLiquidacion
+        "equilibrio" => _maximoOferta
+        => na
+
+    lineaOferta = line.new(bar_index[3], liquidacionOferta, bar_index, liquidacionOferta, xloc=xloc.bar_index, extend=extend.none, color=nivelLiquidacion == "equilibrio" ? colorTransparente : colorNeon8, style=line.style_dashed, width=1)
+    array.push(arrayLineaOferta, lineaOferta)
+
+    if array.size(arrayCajaOferta) > limiteActivas
+        box.delete(array.shift(arrayCajaOferta))
+        line.delete(array.shift(arrayLineaOferta))
+
+if array.size(arrayCajaOferta) > 0
+    for i = 0 to array.size(arrayCajaOferta) - 1
+        idLinea = array.get(arrayLineaOferta, i)
+        idCaja  = array.get(arrayCajaOferta, i)
+        parteSuperiorCaja = box.get_top(idCaja)
+        parteInferiorCaja = box.get_bottom(idCaja)
+        nivelYLinea = line.get_y1(idLinea)
+
+        if high >= nivelYLinea
+            box.delete(array.remove(arrayCajaOferta, i))
+            line.delete(array.remove(arrayLineaOferta, i))
+            break
+        else if high >= parteInferiorCaja
+            cajaOfertaLiquidad = box.new(box.get_left(idCaja), parteSuperiorCaja, bar_index, parteInferiorCaja, border_color=colorTransparente, border_width=1, border_style=line.style_dashed, extend=extend.none, xloc=xloc.bar_index, bgcolor=color.new(colorNeon1, 99))
+            lineaOfertaLiquidad = line.new(line.get_x1(idLinea), nivelYLinea, bar_index, nivelYLinea, xloc=xloc.bar_index, extend=extend.none, color=color.new(colorNeon8, 10), style=line.style_dotted, width=2)
+            etiquetaOfertaLiquidad = label.new(bar_index, nivelYLinea, "", xloc=xloc.bar_index, yloc=yloc.price, color=colorTransparente, style=label.style_label_down, textcolor=color.new(colorNeon6, 40), size=size.small)
+
+            box.delete(idCaja)
+            line.delete(idLinea)
+            array.push(arrayCajaOfertaAnt, cajaOfertaLiquidad)
+            array.push(arrayLineaOfertaAnt, lineaOfertaLiquidad)
+            array.push(arrayEtiquetaOfertaAnt, etiquetaOfertaLiquidad)
+
+            if array.size(arrayCajaOfertaAnt) > limiteLiquidadas
+                box.delete(array.shift(arrayCajaOfertaAnt))
+                line.delete(array.shift(arrayLineaOfertaAnt))
+                label.delete(array.shift(arrayEtiquetaOfertaAnt))
+        else
+            box.set_right(idCaja, bar_index)
+            line.set_x2(idLinea, bar_index)
+
+// ========================
+// Detección de DEMANDA CON COLORES NEON
+// ========================
+velaDerechaDemanda = open[3] > close[3]
+esDemanda = velaDerechaDemanda and (close[1] > close[2]) and (close[2] > close[3])
+
+if esDemanda and nz(ta.barssince(esDemanda[1])) > 3
+    cajaDemanda = box.new(bar_index[3], high[3], bar_index, _minimoDemanda, border_color=colorDemandaLiq, border_width=1, border_style=line.style_solid, extend=extend.right, xloc=xloc.bar_index, bgcolor=colorDemanda)
+    array.push(arrayCajaDemanda, cajaDemanda)
+
+    if mostrarVolumen
+        label.new(bar_index[3], high[3], str.tostring(volumenDemanda, format.percent), xloc=xloc.bar_index, yloc=yloc.price, color=colorTransparente, style=label.style_label_left, textcolor=colorNeon7, size=size.tiny)
+
+    if volumenDemanda >= umbralVolumen
+        box.set_bgcolor(cajaDemanda, color.new(colorNeon9, 75))
+
+    float liquidacionDemanda = switch nivelLiquidacion
+        "equilibrio" => _minimoDemanda
+        => na
+
+    lineaDemanda = line.new(bar_index[3], liquidacionDemanda, bar_index, liquidacionDemanda, xloc=xloc.bar_index, extend=extend.none, color=nivelLiquidacion == "equilibrio" ? colorTransparente : colorNeon7, style=line.style_dashed, width=1)
+    array.push(arrayLineaDemanda, lineaDemanda)
+
+    if array.size(arrayCajaDemanda) > limiteActivas
+        box.delete(array.shift(arrayCajaDemanda))
+        line.delete(array.shift(arrayLineaDemanda))
+
+if array.size(arrayCajaDemanda) > 0
+    for i = 0 to array.size(arrayCajaDemanda) - 1
+        idLinea = array.get(arrayLineaDemanda, i)
+        idCaja  = array.get(arrayCajaDemanda, i)
+        parteSuperiorCaja = box.get_top(idCaja)
+        parteInferiorCaja = box.get_bottom(idCaja)
+        nivelYLinea = line.get_y1(idLinea)
+
+        if low <= nivelYLinea
+            box.delete(array.remove(arrayCajaDemanda, i))
+            line.delete(array.remove(arrayLineaDemanda, i))
+            break
+        else if low <= parteSuperiorCaja
+            cajaDemandaLiquidad = box.new(box.get_left(idCaja), parteSuperiorCaja, bar_index, parteInferiorCaja, border_color=colorTransparente, border_width=1, border_style=line.style_dashed, extend=extend.none, xloc=xloc.bar_index, bgcolor=color.new(colorNeon2, 99))
+            lineaDemandaLiquidad = line.new(line.get_x1(idLinea), nivelYLinea, bar_index, nivelYLinea, xloc=xloc.bar_index, extend=extend.none, color=color.new(colorNeon7, 10), style=line.style_dotted, width=2)
+            etiquetaDemandaLiquidad = label.new(bar_index, nivelYLinea, "", xloc=xloc.bar_index, yloc=yloc.price, color=colorTransparente, style=label.style_label_up, textcolor=color.new(colorNeon9, 40), size=size.small)
+
+            box.delete(idCaja)
+            line.delete(idLinea)
+            array.push(arrayCajaDemandaAnt, cajaDemandaLiquidad)
+            array.push(arrayLineaDemandaAnt, lineaDemandaLiquidad)
+            array.push(arrayEtiquetaDemandaAnt, etiquetaDemandaLiquidad)
+
+            if array.size(arrayCajaDemandaAnt) > limiteLiquidadas
+                box.delete(array.shift(arrayCajaDemandaAnt))
+                line.delete(array.shift(arrayLineaDemandaAnt))
+                label.delete(array.shift(arrayEtiquetaDemandaAnt))
+        else
+            box.set_right(idCaja, bar_index)
+            line.set_x2(idLinea, bar_index)
+
+// ========================
+// FUNCIONES OPTIMIZADAS
+// ========================
+brillo_osc = math.sin(bar_index * 0.1)
+brillo_alpha(a) => math.round(a * 60 + 50)
+
+// ========================
+// MA IRCA OPTIMIZADA CON COLORES NEON
+// ========================
+wma = ta.wma(close, 18)
+rangoMax = 32
+rangoMin = 9
+simetria = 1.0
+
+max_val = ta.highest(wma, rangoMax)
+min_val = ta.lowest(wma, rangoMin)
+centro = (max_val + min_val) / 2
+wma_invertida = centro + (centro - wma) * simetria
+arribaInv = wma_invertida > wma
+
+plot(wma, color=color.new(colorNeon5, 100), linewidth=1)
+plot(wma_invertida, color=arribaInv ? colorNeon1 : colorNeon2, linewidth=2)
+
+sma36 = ta.sma(close, 36)
+sma37 = ta.sma(close, 37)
+plot(sma36, color=colorNeon9, linewidth=1)
+plot(sma37, color=colorNeon10, linewidth=1)
+
+// ========================
+// BLOQUES DE ORDEN OPTIMIZADOS CON COLORES NEON
+// ========================
+longitud_ob = input.int(5, "Velas para Bloque de Orden", minval=1, maxval=10)
+
+// Detección corregida de order blocks
+alcista_ob = false
+bajista_ob = false
+
+if bar_index >= longitud_ob
+    // Bloque alcista: primera vela bajista, luego velas alcistas
+    es_bajista_inicial = close[longitud_ob] < open[longitud_ob]
+    velas_alcistas = true
+    for i = 1 to longitud_ob - 1
+        velas_alcistas := velas_alcistas and close[longitud_ob - i] > open[longitud_ob - i]
+    alcista_ob := es_bajista_inicial and velas_alcistas
+    
+    // Bloque bajista: primera vela alcista, luego velas bajistas
+    es_alcista_inicial = close[longitud_ob] > open[longitud_ob]
+    velas_bajistas = true
+    for i = 1 to longitud_ob - 1
+        velas_bajistas := velas_bajistas and close[longitud_ob - i] < open[longitud_ob - i]
+    bajista_ob := es_alcista_inicial and velas_bajistas
+
+// Limitar cajas a las últimas 100 barras para rendimiento
+recent_bars = 100
+if bar_index >= recent_bars
+    if alcista_ob
+        box.new(bar_index - longitud_ob, high[longitud_ob], bar_index, low[longitud_ob], 
+               bgcolor=color.new(colorNeon4, 70), border_color=colorNeon7)
+        
+    if bajista_ob
+        box.new(bar_index - longitud_ob, high[longitud_ob], bar_index, low[longitud_ob], 
+               bgcolor=color.new(colorNeon1, 70), border_color=colorNeon3)
+
+// ========================
+// CRUCES CORREGIDOS
+// ========================
+cruce_sma36_arriba = ta.crossover(wma_invertida, sma36)
+cruce_sma36_abajo = ta.crossunder(wma_invertida, sma36)
+cruce_sma37_arriba = ta.crossover(wma_invertida, sma37)
+cruce_sma37_abajo = ta.crossunder(wma_invertida, sma37)
+
+// ========================
+// ALERTAS MEJORADAS CON COLORES NEON
+// ========================
+proximidad_bo = alcista_ob or alcista_ob[1] or bajista_ob or bajista_ob[1]
+cruce_importante = cruce_sma36_arriba or cruce_sma36_abajo or cruce_sma37_arriba or cruce_sma37_abajo
