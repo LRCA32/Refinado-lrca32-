@@ -5,9 +5,9 @@
 indicator("CCI Extremo (© lrca32)", overlay=false)
 
 // Inputs para los tres períodos
-cciLength1 = input.int(9, title="CCI1")
-cciLength2 = input.int(18, title="CCI2")
-cciLength3 = input.int(36, title="CCI3")
+cciLength1 = input.int(25, title="CCI1")
+cciLength2 = input.int(50, title="CCI2")
+cciLength3 = input.int(100, title="CCI3")
 
 // Cálculo de los tres CCI
 cci1 = ta.cci(close, cciLength1)
@@ -15,10 +15,11 @@ cci2 = ta.cci(close, cciLength2)
 cci3 = ta.cci(close, cciLength3)
 
 // Dibujar las líneas de CCI
-plot(cci1, color=color.new(#39FF14, 0), title="CCI1")
-plot(cci2, color=color.new(#007BFF, 0), title="CCI2")
-plot(cci3, color=color.new(#FF00FF, 0), title="CCI3")
+plot(cci1, color=color.new(#9c9c9c, 0), title="CCI1")
+plot(cci2, color=color.new(#4a4a4a, 0), title="CCI2")
+plot(cci3, color=color.new(#000000, 0), title="CCI3")
 
 // Dibujar los niveles de Oferta/Demanda
-hline(200, color=color.rgb(255, 0, 90), title="Oferta")
-hline(-200, color=color.rgb(0, 140, 255), title="Demanda")
+hline(200, color=color.rgb(255, 0, 60), title="Oferta")
+hline(0, color=color.rgb(252, 187, 0), title="cero")
+hline(-200, color=color.rgb(0, 179, 255), title="Demanda")
