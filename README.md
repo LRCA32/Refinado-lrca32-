@@ -1,19 +1,44 @@
-# Refinado (© lrca32)
+# Refinado-lrca32 🚀
 
-Indicador avanzado de oferta y demanda para TradingView (Pine Script v6), que dibuja zonas dinámicas, liquida zonas al contacto y muestra medias móviles invertidas, junto con otros cálculos técnicos.
+¡Hola! Soy LRCA32 y este es mi pequeño juguete para TradingView: un "indicador de oferta y demanda" que hace gran parte del trabajo duro por ti.  
 
-## Características principales
+Sí, aún no soy un pro, pero este indicador ya me salva la vida (o al menos mi gráfico 😅).
 
-* Detección automática de Oferta y Demanda.
+---
 
-* Extensión dinámica de zonas activas.
+    🔹 Qué hace
 
-* Marcado visual de zonas liquidadas.
+- Detecta automáticamente zonas de "oferta y demanda"
+- Zonas dinámicas que se ajustan al mercadobiografía
+- Medias móviles para que no te pierdas en el gráfico
+- Alertas automáticas, porque a veces tu gato toca la pantalla y pierdes oportunidades 🐱💸
 
-* Líneas de equilibrio opcionales.
+---
 
-* Gestión automática de límites de zonas activas y liquidadas.
+    ⚡ Cómo usarlo
 
-* Cálculo de **Medias Móviles**.
+1. Copia el código en TradingView.
+2. Guarda como indicador.
+3. Agrégalo a tu gráfico.
+4. Observa cómo las zonas aparecen como magia ✨
 
-* Opciones de personalización: periodos, colores, volúmenes, límites.
+> Consejo: ajusta las medias móviles a tu gusto y diviértete viendo cómo el indicador resalta las zonas clave.
+
+---
+
+    📈 Extras
+
+- ¡Puedes jugar con los parámetros y ver qué pasa!
+- Ideal para traders curiosos o gente que solo quiere ver gráficos cool.
+
+---
+
+    💡 Contribuciones
+
+Si tienes ideas locas o mejoras, abre un **issue** o un **pull request**. ¡No muerdo! 🐉
+
+---
+
+    Licencia
+
+MIT — úsalo, tócalo, rompe algo y aprende 😎
