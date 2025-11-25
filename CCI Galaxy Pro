@@ -1,0 +1,75 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+
+//@version=6
+indicator("CCI Galaxy Pro", overlay=false, max_lines_count=500)
+
+// -------------------- INPUTS --------------------
+len1 = input.int(25,  "CCI 1")
+len2 = input.int(50,  "CCI 2")
+len3 = input.int(100, "CCI 3")
+
+glowStrength = input.int(60, "Glow Strength (0–100)", minval=0, maxval=100)
+areaTransp = 70
+
+// -------------------- HELPERS --------------------
+clamp(x, lo, hi) => math.min(math.max(x, lo), hi)
+lerp(a, b, t) => a + (b - a) * t
+norm(x) =>
+    n = (x + 300.0) / 600.0
+    clamp(n, 0.0, 1.0)
+
+// -------------------- CCI SERIES --------------------
+cci1 = ta.cci(close, len1)
+cci2 = ta.cci(close, len2)
+cci3 = ta.cci(close, len3)
+
+// -------------------- GALAXY COLORS --------------------
+galaxyColor(x) =>
+    n = norm(x)
+
+    r = n < 0.33 ? lerp(0,   120, n / 0.33) : n < 0.66 ? lerp(120, 200, (n - 0.33) / 0.33) : lerp(200, 255, (n - 0.66) / 0.34)
+
+    g = n < 0.33 ? lerp(50,   0, n / 0.33) : n < 0.66 ? lerp(0,   20, (n - 0.33) / 0.33) : lerp(20, 160, (n - 0.66) / 0.34)
+
+    b = n < 0.33 ? lerp(255, 180, n / 0.33) :  n < 0.66 ? lerp(180, 90, (n - 0.33) / 0.33) : lerp(90,  0,  (n - 0.66) / 0.34)
+
+    color.rgb(r, g, b)
+
+col1 = galaxyColor(cci1)
+col2 = galaxyColor(cci2)
+col3 = galaxyColor(cci3)
+
+// -------------------- GLOW COLORS --------------------
+innerT = int(clamp(100 - glowStrength, 0, 100))
+outerT = int(clamp(120 - glowStrength, 0, 100))
+
+glowOuter1 = color.new(col1, outerT)
+glowInner1 = color.new(col1, innerT)
+
+glowOuter2 = color.new(col2, outerT)
+glowInner2 = color.new(col2, innerT)
+
+glowOuter3 = color.new(col3, outerT)
+glowInner3 = color.new(col3, innerT)
+
+// -------------------- GLOW PLOTS --------------------
+// Glow Outer — línea suave
+plot(cci1, "CCI1 Glow Outer", color=glowOuter1, linewidth=1)
+plot(cci2, "CCI2 Glow Outer", color=glowOuter2, linewidth=1)
+plot(cci3, "CCI3 Glow Outer", color=glowOuter3, linewidth=1)
+
+// -------------------- LINEAS GALAXY --------------------
+p1 = plot(cci1, title="CCI1 Galaxy Line", color=col1, linewidth=1)
+p2 = plot(cci2, title="CCI2 Galaxy Line", color=col2, linewidth=1)
+p3 = plot(cci3, title="CCI3 Galaxy Line", color=col3, linewidth=2)
+
+// -------------------- AREAS GALAXY --------------------
+fill(p1, p2, color=color.new(col1, areaTransp))
+fill(p2, p3, color=color.new(col3, areaTransp))
+fill(p1, p3, color=color.new(col2, areaTransp))
+
+// -------------------- LEVELS --------------------
+hline(200,  "Sobrecompra 200",  color=color.new(#ff004c, 0))
+hline(0,    "Cero",             color=color.new(#947902, 0))
+hline(-200, "Sobreventa -200",  color=color.new(#008cff, 0))
