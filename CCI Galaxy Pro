@@ -6,13 +6,12 @@ indicator("CCI Galaxy Pro", overlay=false, max_lines_count=500)
 
 // -------------------- INPUTS --------------------
 len1 = input.int(25,  "CCI 1")
-len2 = input.int(50,  "CCI 2")
-len3 = input.int(100, "CCI 3")
+len2 = input.int(100,  "CCI 2")
+len3 = input.int(200, "CCI 3")
 
-glowStrength = input.int(60, "Glow Strength (0–100)", minval=0, maxval=100)
-areaTransp = 70
+glowStrength = 73
+areaTransp = input.int(60, "transparante", minval=0, maxval=100)
 
-// -------------------- HELPERS --------------------
 clamp(x, lo, hi) => math.min(math.max(x, lo), hi)
 lerp(a, b, t) => a + (b - a) * t
 norm(x) =>
@@ -55,21 +54,19 @@ glowInner3 = color.new(col3, innerT)
 
 // -------------------- GLOW PLOTS --------------------
 // Glow Outer — línea suave
-plot(cci1, "CCI1 Glow Outer", color=glowOuter1, linewidth=1)
-plot(cci2, "CCI2 Glow Outer", color=glowOuter2, linewidth=1)
-plot(cci3, "CCI3 Glow Outer", color=glowOuter3, linewidth=1)
+plot(cci1, "CCI1 Glow Outer", color=glowOuter1, linewidth=1 , style = plot.style_histogram)
+plot(cci2, "CCI2 Glow Outer", color=glowOuter2, linewidth=1, style = plot.style_histogram)
+plot(cci3, "CCI3 Glow Outer", color=glowOuter3, linewidth=1, style = plot.style_histogram)
 
 // -------------------- LINEAS GALAXY --------------------
-p1 = plot(cci1, title="CCI1 Galaxy Line", color=col1, linewidth=1)
-p2 = plot(cci2, title="CCI2 Galaxy Line", color=col2, linewidth=1)
-p3 = plot(cci3, title="CCI3 Galaxy Line", color=col3, linewidth=2)
-
+p1 = plot(cci1, title="CCI1 Galaxy Line", color=col1, linewidth=2, linestyle = plot.linestyle_dotted)
+p2 = plot(cci2, title="CCI2 Galaxy Line", color=col2, linewidth=2, linestyle = plot.linestyle_dotted)
+p3 = plot(cci3, title="CCI3 Galaxy Line", color=col3, linewidth=2, linestyle = plot.linestyle_dotted)
 // -------------------- AREAS GALAXY --------------------
 fill(p1, p2, color=color.new(col1, areaTransp))
 fill(p2, p3, color=color.new(col3, areaTransp))
 fill(p1, p3, color=color.new(col2, areaTransp))
 
 // -------------------- LEVELS --------------------
-hline(200,  "Sobrecompra 200",  color=color.new(#ff004c, 0))
-hline(0,    "Cero",             color=color.new(#947902, 0))
-hline(-200, "Sobreventa -200",  color=color.new(#008cff, 0))
+hline(200,  "Sobrecompra 200",  color=color.new(#FF27C9, 0))
+hline(-200, "Sobreventa -200",  color=color.new(#7F00FF, 0))
