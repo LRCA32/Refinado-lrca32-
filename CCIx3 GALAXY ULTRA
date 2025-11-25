@@ -1,0 +1,81 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+
+//@version=6
+indicator("CCIx3 GALAXY ULTRA", overlay=false, max_lines_count=500)
+
+//-----------------------------------------------------
+// INPUTS
+//-----------------------------------------------------
+len1 = input.int(25,  "CCI 1")
+len2 = input.int(50,  "CCI 2")
+len3 = input.int(100, "CCI 3")
+
+speed = input.float(0.6, "Velocidad Galáctica", minval=0.1, maxval=3.0)
+brightness = input.float(1.3, "Brillo Cósmico", minval=0.5, maxval=2.5)
+
+//-----------------------------------------------------
+// CCIs
+//-----------------------------------------------------
+cci1 = ta.cci(close, len1)
+cci2 = ta.cci(close, len2)
+cci3 = ta.cci(close, len3)
+
+//-----------------------------------------------------
+// Clamp
+//-----------------------------------------------------
+clamp(x, lo, hi) =>
+    math.min(math.max(x, lo), hi)
+
+//-----------------------------------------------------
+// Normalización
+//-----------------------------------------------------
+norm(x) =>
+    clamp((x + 300.0) / 600.0, 0, 1)
+
+//-----------------------------------------------------
+// ENGINE GALAXY – mezcla cósmica de 3 paletas
+//-----------------------------------------------------
+galaxy(hueShift, x) =>
+    n = norm(x)
+    t = timenow * speed * 0.00004
+
+    // movimiento suave estilo nebulosa
+    h = (n * 180 + (t + hueShift) % 360)
+
+    // saturación baja para efecto espacial suave
+    s = 0.55 + n * 0.45
+    v = brightness * (0.6 + n * 0.4)
+
+    c = v * s
+    k = (h / 60) % 2
+    x2 = c * (1 - math.abs(k - 1))
+    m = v - c
+
+    r = h < 60  ? c : h < 120 ? x2 : h < 180 ? 0  : h < 240 ? 0  : h < 300 ? x2 : c
+    g = h < 60  ? x2: h < 120 ? c  : h < 180 ? c  : h < 240 ? x2 : h < 300 ? 0  : 0
+    b = h < 60  ? 0  : h < 120 ? 0  : h < 180 ? x2 : h < 240 ? c  : h < 300 ? c  : x2
+
+    color.rgb((r+m)*255,(g+m)*255,(b+m)*255)
+
+//-----------------------------------------------------
+// COLORES GALAXY PARA CCI1–3
+//-----------------------------------------------------
+col1 = galaxy(0,    cci1)    // Nebulosa azul-violeta
+col2 = galaxy(1200, cci2)    // Aurora verde-cyan
+col3 = galaxy(2400, cci3)    // Nebula rosa-espacial
+
+
+//-----------------------------------------------------
+// HISTOGRAMAS GALÁCTICOS
+//-----------------------------------------------------
+plot(cci1, "Galaxy Histo 1", style=plot.style_columns, color=color.new(col1, 70))
+plot(cci2, "Galaxy Histo 2", style=plot.style_columns, color=color.new(col2, 70))
+plot(cci3, "Galaxy Histo 3", style=plot.style_columns, color=color.new(col3, 70))
+
+//-----------------------------------------------------
+// LÍNEAS PRINCIPALES GALAXY
+//-----------------------------------------------------
+plot(cci1, "CCI 1 Galaxy", color=col1, linewidth=2)
+plot(cci2, "CCI 2 Galaxy", color=col2, linewidth=2)
+plot(cci3, "CCI 3 Galaxy", color=col3, linewidth=3)
