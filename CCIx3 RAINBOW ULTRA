@@ -1,0 +1,66 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+
+//@version=6
+indicator("CCIx3 RAINBOW ULTRA", overlay=false, max_lines_count=500)
+
+//-----------------------------------------------------
+// INPUTS
+//-----------------------------------------------------
+len1 = input.int(25,  "CCI 1")
+len2 = input.int(50,  "CCI 2")
+len3 = input.int(100, "CCI 3")
+
+speed = input.float(0.8, "Velocidad del arcoiris", minval=0.1, maxval=5.0)
+brightness = input.float(1.0, "Brillo", minval=0.5, maxval=2.5)
+
+//-----------------------------------------------------
+// CCIs
+//-----------------------------------------------------
+cci1 = ta.cci(close, len1)
+cci2 = ta.cci(close, len2)
+cci3 = ta.cci(close, len3)
+
+//-----------------------------------------------------
+// Rainbow Engine (HSV → RGB)
+//-----------------------------------------------------
+rainbow(t) =>
+    // ciclo 0→360
+    h = (t % 360)
+
+    // saturación y valor altos para efecto neón
+    s = 1.0
+    v = brightness
+
+    c = v * s
+    x = c * (1 - math.abs((h / 60) % 2 - 1))
+    m = v - c
+
+    r = h < 60  ? c : h < 120 ? x : h < 180 ? 0 : h < 240 ? 0 : h < 300 ? x : c
+    g = h < 60  ? x : h < 120 ? c : h < 180 ? c : h < 240 ? x : h < 300 ? 0 : 0
+    b = h < 60  ? 0 : h < 120 ? 0 : h < 180 ? x : h < 240 ? c : h < 300 ? c : x
+
+    color.rgb((r+m)*255, (g+m)*255, (b+m)*255)
+
+//-----------------------------------------------------
+// RAINBOW COLORS dinámicos
+//-----------------------------------------------------
+t = timenow * speed * 0.00005
+
+col1 = rainbow(t       + cci1)
+col2 = rainbow(t +1000 + cci2)
+col3 = rainbow(t +2000 + cci3)
+
+//-----------------------------------------------------
+// HISTOGRAMA RAINBOW ULTRA
+//-----------------------------------------------------
+plot(cci1, "Histo 1", style=plot.style_columns, color=color.new(col1, 65))
+plot(cci2, "Histo 2", style=plot.style_columns, color=color.new(col2, 65))
+plot(cci3, "Histo 3", style=plot.style_columns, color=color.new(col3, 65))
+
+//-----------------------------------------------------
+// LÍNEAS PRINCIPALES ARCOIRIS
+//-----------------------------------------------------
+plot(cci1, "CCI 1 Rainbow", color=col1, linewidth=2)
+plot(cci2, "CCI 2 Rainbow", color=col2, linewidth=2)
+plot(cci3, "CCI 3 Rainbow", color=col3, linewidth=3)
