@@ -1,0 +1,91 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+
+//@version=6
+indicator("CCI RAINBOW PRO", overlay=false, max_lines_count=500)
+
+// -------------------- INPUTS --------------------
+len1 = input.int(25,  "CCI 1")
+len2 = input.int(100, "CCI 2")
+len3 = input.int(200, "CCI 3")
+
+glowStrength = input.int(30, "Fuerza Glow", minval=0, maxval=100)
+areaTransp = input.int(75, "Transparencia Áreas", minval=0, maxval=100)
+
+// -------------------- COLORES RAINBOW ULTRA --------------------
+colorRainbow1 = #FF0000    // 🔴 Rojo intenso
+colorRainbow2 = #FF3300    // 🟠 Naranja rojizo
+colorRainbow3 = #FF6600    // 🟠 Naranja puro
+colorRainbow4 = #FF9900    // 🟡 Naranja amarillo
+colorRainbow5 = #FFCC00    // 🟡 Amarillo brillante
+colorRainbow6 = #00FF00    // 🟢 Verde neón
+colorRainbow7 = #00FF99    // 🟢 Verde agua
+colorRainbow8 = #00FFFF    // 🔵 Cian eléctrico
+colorRainbow9 = #0066FF    // 🔵 Azul claro
+colorRainbow10 = #0000FF   // 🔵 Azul intenso
+colorRainbow11 = #6600FF   // 🟣 Azul violeta
+colorRainbow12 = #CC00FF   // 🟣 Violeta neón
+colorRainbow13 = #FF00FF   // 🟣 Magenta fluorescente
+colorRainbow14 = #FF0099   // 🟣 Rosa intenso
+
+// Función para obtener color rainbow dinámico
+get_rainbow_color(index, offset) =>
+    colors = array.from(colorRainbow1, colorRainbow2, colorRainbow3, colorRainbow4, colorRainbow5, 
+                       colorRainbow6, colorRainbow7, colorRainbow8, colorRainbow9, colorRainbow10,
+                       colorRainbow11, colorRainbow12, colorRainbow13, colorRainbow14)
+    array.get(colors, (index + offset) % array.size(colors))
+
+// -------------------- FUNCIONES UTILES --------------------
+clamp(x, lo, hi) => math.min(math.max(x, lo), hi)
+lerp(a, b, t) => a + (b - a) * t
+norm(x) =>
+    n = (x + 300.0) / 600.0
+    clamp(n, 0.0, 1.0)
+
+// -------------------- CCI SERIES --------------------
+cci1 = ta.cci(close, len1)
+cci2 = ta.cci(close, len2)
+cci3 = ta.cci(close, len3)
+
+// -------------------- COLORS RAINBOW DINÁMICOS --------------------
+// Colores que rotan basados en el valor CCI
+col1 = get_rainbow_color(math.round(math.abs(cci1) / 20), 0)
+col2 = get_rainbow_color(math.round(math.abs(cci2) / 20), 4)
+col3 = get_rainbow_color(math.round(math.abs(cci3) / 20), 8)
+
+// -------------------- GLOW EFFECTS RAINBOW --------------------
+innerT = int(clamp(100 - glowStrength, 0, 100))
+outerT = int(clamp(120 - glowStrength, 0, 100))
+
+glowOuter1 = color.new(col1, outerT)
+glowInner1 = color.new(col1, innerT)
+
+glowOuter2 = color.new(col2, outerT)
+glowInner2 = color.new(col2, innerT)
+
+glowOuter3 = color.new(col3, outerT)
+glowInner3 = color.new(col3, innerT)
+
+// -------------------- PLOT CON EFECTOS RAINBOW --------------------
+// Glow Outer — efecto neón
+plot(cci1, "CCI1 Rainbow Glow", color=glowOuter1, linewidth=4, style=plot.style_histogram)
+plot(cci2, "CCI2 Rainbow Glow", color=glowOuter2, linewidth=4, style=plot.style_histogram)
+plot(cci3, "CCI3 Rainbow Glow", color=glowOuter3, linewidth=4, style=plot.style_histogram)
+
+// Líneas principales rainbow
+p1 = plot(cci1, title="CCI1 Rainbow Line", color=col1, linewidth=3)
+p2 = plot(cci2, title="CCI2 Rainbow Line", color=col2, linewidth=3)
+p3 = plot(cci3, title="CCI3 Rainbow Line", color=col3, linewidth=3)
+
+// -------------------- AREAS CON GRADIENTE RAINBOW --------------------
+fill(p1, p2, color=color.new(col1, areaTransp), title="Área CCI1-2")
+fill(p2, p3, color=color.new(col2, areaTransp), title="Área CCI2-3")
+fill(p1, p3, color=color.new(col3, areaTransp), title="Área CCI1-3")
+
+// -------------------- NIVELES CON COLORES RAINBOW --------------------
+// Líneas de sobrecompra/sobreventa con colores dinámicos
+h1 = hline(200, "Sobrecompra 200", color=color.new(colorRainbow13, 50), linestyle=hline.style_dashed)
+h2 = hline(100, "Sobrecompra 100", color=color.new(colorRainbow5, 60), linestyle=hline.style_dotted)
+h3 = hline(0,   "Línea Cero", color=color.new(colorRainbow8, 70), linestyle=hline.style_solid)
+h4 = hline(-100, "Sobreventa -100", color=color.new(colorRainbow6, 60), linestyle=hline.style_dotted)
+h5 = hline(-200, "Sobreventa -200", color=color.new(colorRainbow1, 50), linestyle=hline.style_dashed)
