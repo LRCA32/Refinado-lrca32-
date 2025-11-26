@@ -1,0 +1,298 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+
+//@version=6
+indicator("Zonas Inteligentes O/D", overlay=true, max_boxes_count=500, max_labels_count=500)
+
+// ========================
+// CONFIGURACIÓN PRINCIPAL
+// ========================
+
+// --- Oferta y Demanda ---
+periodosOferta = input.int(3, "Periodos Oferta", minval=1, maxval=50)
+periodosDemanda = input.int(3, "Periodos Demanda", minval=1, maxval=50)
+
+// --- Límites de elementos ---
+limiteActivas = input.int(500, "Límite Activas", minval=0, maxval=580)
+limiteLiquidadas = input.int(3, "Límite Liquidadas", minval=0, maxval=250)
+
+// --- Configuración visual ---
+mostrarLineasLiquidacion = input.bool(false, "Mostrar líneas de liquidación")
+mostrarVolumen = false
+umbralVolumen = 0.0
+
+// ========================
+// PALETA DE COLORES
+// ========================
+
+// Oferta y Demanda
+colorOferta = color.new(#FF0033, 90)
+colorOfertaLiq = color.new(#FF0033, 30)
+colorDemanda = color.new(#007BFF, 90)
+colorDemandaLiq = color.new(#007BFF, 30)
+colorTransparente = color.new(#ffffff, 100)
+
+// ========================
+// VARIABLES GLOBALES
+// ========================
+
+// Arrays Oferta
+var array<box> arrayCajaOferta = array.new_box()
+var array<line> arrayLineaOferta = array.new_line()
+var array<box> arrayCajaOfertaAnt = array.new_box()
+var array<line> arrayLineaOfertaAnt = array.new_line()
+var array<label> arrayEtiquetaOfertaAnt = array.new_label()
+
+// Arrays Demanda
+var array<box> arrayCajaDemanda = array.new_box()
+var array<line> arrayLineaDemanda = array.new_line()
+var array<box> arrayCajaDemandaAnt = array.new_box()
+var array<line> arrayLineaDemandaAnt = array.new_line()
+var array<label> arrayEtiquetaDemandaAnt = array.new_label()
+
+// ========================
+// FUNCIONES DE DETECCIÓN
+// ========================
+
+// Cálculos básicos
+_maximoOferta = ta.highest(high, periodosOferta)
+_minimoDemanda = ta.lowest(low, periodosDemanda)
+volumenOferta = volume
+volumenDemanda = volume
+
+// Detección de OFERTA
+velaDerechaOferta = open[3] < close[3]
+esOferta = velaDerechaOferta and (close[1] < close[2]) and (close[2] < close[3])
+
+// Detección de DEMANDA
+velaDerechaDemanda = open[3] > close[3]
+esDemanda = velaDerechaDemanda and (close[1] > close[2]) and (close[2] > close[3])
+
+// ========================
+// GESTIÓN DE OFERTA
+// ========================
+
+if esOferta and nz(ta.barssince(esOferta[1])) > 3
+    // Crear caja de oferta
+    cajaOferta = box.new(bar_index[3], _maximoOferta, bar_index, low[3], border_color=colorOfertaLiq, border_width=1, border_style=line.style_solid, extend=extend.right, xloc=xloc.bar_index, bgcolor=colorOferta)
+    array.push(arrayCajaOferta, cajaOferta)
+    
+    // Etiqueta de volumen
+    if mostrarVolumen
+        label.new(bar_index[3], _maximoOferta, str.tostring(volumenOferta, format.percent), 
+                 xloc=xloc.bar_index, yloc=yloc.price, color=colorTransparente, 
+                 style=label.style_label_left, textcolor=colorOfertaLiq, size=size.tiny)
+    
+    // Resaltar volumen alto
+    if volumenOferta >= umbralVolumen
+        box.set_bgcolor(cajaOferta, color.new(colorOfertaLiq, 75))
+    
+    // Línea de liquidación (solo si está activado)
+    liquidacionOferta = mostrarLineasLiquidacion ? _maximoOferta : na
+    lineaOferta = line.new(bar_index[3], liquidacionOferta, bar_index, liquidacionOferta, 
+                          xloc=xloc.bar_index, extend=extend.none, 
+                          color=mostrarLineasLiquidacion ? colorOfertaLiq : colorTransparente, 
+                          style=line.style_dashed, width=1)
+    array.push(arrayLineaOferta, lineaOferta)
+    
+    // Limitar elementos activos
+    if array.size(arrayCajaOferta) > limiteActivas
+        box.delete(array.shift(arrayCajaOferta))
+        line.delete(array.shift(arrayLineaOferta))
+
+// Gestión continua de ofertas activas
+if array.size(arrayCajaOferta) > 0
+    for i = 0 to array.size(arrayCajaOferta) - 1
+        idLinea = array.get(arrayLineaOferta, i)
+        idCaja = array.get(arrayCajaOferta, i)
+        parteSuperiorCaja = box.get_top(idCaja)
+        parteInferiorCaja = box.get_bottom(idCaja)
+        nivelYLinea = line.get_y1(idLinea)
+        
+        if high >= nivelYLinea
+            // Eliminar oferta completamente liquidada
+            box.delete(array.remove(arrayCajaOferta, i))
+            line.delete(array.remove(arrayLineaOferta, i))
+            break
+        else if high >= parteInferiorCaja
+            // Marcar como parcialmente liquidada
+            cajaOfertaLiquidad = box.new(box.get_left(idCaja), parteSuperiorCaja, bar_index, parteInferiorCaja, border_color=colorTransparente, border_width=1, border_style=line.style_dashed, extend=extend.none, xloc=xloc.bar_index, bgcolor=color.new(colorOferta, 99))
+            lineaOfertaLiquidad = line.new(line.get_x1(idLinea), nivelYLinea, bar_index, nivelYLinea, 
+                                         xloc=xloc.bar_index, extend=extend.none, 
+                                         color=color.new(colorOfertaLiq, 10), style=line.style_dotted, width=2)
+            etiquetaOfertaLiquidad = label.new(bar_index, nivelYLinea, "", xloc=xloc.bar_index, 
+                                             yloc=yloc.price, color=colorTransparente, 
+                                             style=label.style_label_down, 
+                                             textcolor=color.new(colorOfertaLiq, 40), size=size.small)
+            
+            // Actualizar arrays
+            box.delete(idCaja)
+            line.delete(idLinea)
+            array.push(arrayCajaOfertaAnt, cajaOfertaLiquidad)
+            array.push(arrayLineaOfertaAnt, lineaOfertaLiquidad)
+            array.push(arrayEtiquetaOfertaAnt, etiquetaOfertaLiquidad)
+            
+            // Limitar ofertas liquidadas
+            if array.size(arrayCajaOfertaAnt) > limiteLiquidadas
+                box.delete(array.shift(arrayCajaOfertaAnt))
+                line.delete(array.shift(arrayLineaOfertaAnt))
+                label.delete(array.shift(arrayEtiquetaOfertaAnt))
+        else
+            // Extender oferta activa
+            box.set_right(idCaja, bar_index)
+            line.set_x2(idLinea, bar_index)
+
+// ========================
+// GESTIÓN DE DEMANDA
+// ========================
+
+if esDemanda and nz(ta.barssince(esDemanda[1])) > 3
+    // Crear caja de demanda
+    cajaDemanda = box.new(bar_index[3], high[3], bar_index, _minimoDemanda, 
+                         border_color=colorDemandaLiq, border_width=1, 
+                         border_style=line.style_solid, extend=extend.right, 
+                         xloc=xloc.bar_index, bgcolor=colorDemanda)
+    array.push(arrayCajaDemanda, cajaDemanda)
+    
+    // Etiqueta de volumen
+    if mostrarVolumen
+        label.new(bar_index[3], high[3], str.tostring(volumenDemanda, format.percent), 
+                 xloc=xloc.bar_index, yloc=yloc.price, color=colorTransparente, 
+                 style=label.style_label_left, textcolor=colorDemandaLiq, size=size.tiny)
+    
+    // Resaltar volumen alto
+    if volumenDemanda >= umbralVolumen
+        box.set_bgcolor(cajaDemanda, color.new(colorDemandaLiq, 75))
+    
+    // Línea de liquidación (solo si está activado)
+    liquidacionDemanda = mostrarLineasLiquidacion ? _minimoDemanda : na
+    lineaDemanda = line.new(bar_index[3], liquidacionDemanda, bar_index, liquidacionDemanda, 
+                           xloc=xloc.bar_index, extend=extend.none, 
+                           color=mostrarLineasLiquidacion ? colorDemandaLiq : colorTransparente, 
+                           style=line.style_dashed, width=1)
+    array.push(arrayLineaDemanda, lineaDemanda)
+    
+    // Limitar elementos activos
+    if array.size(arrayCajaDemanda) > limiteActivas
+        box.delete(array.shift(arrayCajaDemanda))
+        line.delete(array.shift(arrayLineaDemanda))
+
+// Gestión continua de demandas activas
+if array.size(arrayCajaDemanda) > 0
+    for i = 0 to array.size(arrayCajaDemanda) - 1
+        idLinea = array.get(arrayLineaDemanda, i)
+        idCaja = array.get(arrayCajaDemanda, i)
+        parteSuperiorCaja = box.get_top(idCaja)
+        parteInferiorCaja = box.get_bottom(idCaja)
+        nivelYLinea = line.get_y1(idLinea)
+        
+        if low <= nivelYLinea
+            // Eliminar demanda completamente liquidada
+            box.delete(array.remove(arrayCajaDemanda, i))
+            line.delete(array.remove(arrayLineaDemanda, i))
+            break
+        else if low <= parteSuperiorCaja
+            // Marcar como parcialmente liquidada
+            cajaDemandaLiquidad = box.new(box.get_left(idCaja), parteSuperiorCaja, bar_index, parteInferiorCaja, 
+                                         border_color=colorTransparente, border_width=1, 
+                                         border_style=line.style_dashed, extend=extend.none, 
+                                         xloc=xloc.bar_index, bgcolor=color.new(colorDemanda, 99))
+            lineaDemandaLiquidad = line.new(line.get_x1(idLinea), nivelYLinea, bar_index, nivelYLinea, 
+                                          xloc=xloc.bar_index, extend=extend.none, 
+                                          color=color.new(colorDemandaLiq, 10), style=line.style_dotted, width=2)
+            etiquetaDemandaLiquidad = label.new(bar_index, nivelYLinea, "", xloc=xloc.bar_index, 
+                                              yloc=yloc.price, color=colorTransparente, 
+                                              style=label.style_label_up, 
+                                              textcolor=color.new(colorDemandaLiq, 40), size=size.small)
+            
+            // Actualizar arrays
+            box.delete(idCaja)
+            line.delete(idLinea)
+            array.push(arrayCajaDemandaAnt, cajaDemandaLiquidad)
+            array.push(arrayLineaDemandaAnt, lineaDemandaLiquidad)
+            array.push(arrayEtiquetaDemandaAnt, etiquetaDemandaLiquidad)
+            
+            // Limitar demandas liquidadas
+            if array.size(arrayCajaDemandaAnt) > limiteLiquidadas
+                box.delete(array.shift(arrayCajaDemandaAnt))
+                line.delete(array.shift(arrayLineaDemandaAnt))
+                label.delete(array.shift(arrayEtiquetaDemandaAnt))
+        else
+            // Extender demanda activa
+            box.set_right(idCaja, bar_index)
+            line.set_x2(idLinea, bar_index)
+
+// ========================
+// INDICADORES TÉCNICOS
+// ========================
+
+// WMA Invertida
+wma = ta.wma(close, 18)
+wma00 = ta.wma(close, 1)
+
+rangoMax = 32
+rangoMin = 9
+simetria = 1.0
+
+max_val = ta.highest(wma, rangoMax)
+min_val = ta.lowest(wma, rangoMin)
+centro = (max_val + min_val) / 2
+
+wma_invertida = centro + (centro - wma) * simetria
+arribaInv = wma_invertida > wma
+color_inv = arribaInv ? color.new(#FF0033, 0) : color.new(#007BFF, 0)
+
+// Medias Móviles Simples
+sma36 = ta.sma(close, 36)
+sma37 = ta.sma(close, 37)
+
+// =============================
+// 1. PALETA BASE (NEÓN)
+// =============================
+color0 = color.new(#D800FF, 0) // Morado neón (-300)
+color1 = color.new(#FF0000, 0) // Rojo neón
+color2 = color.new(#FF8C00, 0) // Naranja neón
+color3 = color.new(#FFD700, 0) // Amarillo neón
+color4 = color.new(#00FF00, 0) // Verde neón
+color5 = color.new(#CCFF00, 0) // Lima neón (+300)
+
+// =============================
+// 2. FUNCIÓN: Mezcla RGB
+// =============================
+f_mixColor(colorA, colorB, t) =>
+    r = color.r(colorA) + (color.r(colorB) - color.r(colorA)) * t
+    g = color.g(colorA) + (color.g(colorB) - color.g(colorA)) * t
+    b = color.b(colorA) + (color.b(colorB) - color.b(colorA)) * t
+    color.rgb(r, g, b)
+
+// =============================
+// 3. GRADIENTE DE 512 NIVELES
+// =============================
+f_ccicolor(cci) =>
+    // Normalizar CCI a rango 0..1
+    v = math.max(math.min((cci + 300) / 600, 1), 0)
+
+    // Dividir en 6 tramos
+    segment = v * 6
+    idx = math.floor(segment)
+    t = segment - idx   // interpolación precisa
+
+    // Colores del tramo
+    cA = idx == 0 ? color0 : idx == 1 ? color1 : idx == 2 ? color2 : idx == 3 ? color3 : idx == 4 ? color4 : color5
+
+    cB = idx == 0 ? color1 : idx == 1 ? color2 : idx == 2 ? color3 : idx == 3 ? color4 : idx == 4 ? color5 : color5
+
+    // Mezcla fina → 512 niveles reales
+    f_mixColor(cA, cB, t)
+
+// =============================
+// 4. CCI
+// =============================
+cciPeriod = input.int(20, "Período CCI")
+cci1 = ta.cci(close, cciPeriod)
+
+// =============================
+// 5. COLOR FINAL
+// =============================
+colorVela = f_ccicolor(cci1)
+barcolor(color.new(colorVela, 0))
