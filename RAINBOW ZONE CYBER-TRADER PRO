@@ -1,0 +1,345 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+
+//@version=6
+// ========================
+// RAINBOW ZONE CYBER-TRADER PRO
+// ========================
+indicator("RAINBOW ZONE CYBER-TRADER PRO", overlay=true, max_boxes_count=500, max_lines_count=500)
+
+// ========================
+// PARÁMETROS DE OFERTA Y DEMANDA
+// ========================
+periodosOferta  = input.int(3, "Periodos Oferta", minval=1, maxval=50)
+periodosDemanda = input.int(3, "Periodos Demanda", minval=1, maxval=50)
+
+nivelLiquidacion = "equilibrio"
+mostrarVolumen   = input.bool(false, "Mostrar Volumen")
+umbralVolumen    = input.float(0.0, "Umbral Volumen", minval=0.0)
+limiteActivas   = input.int(500, "Límite Activas", minval=0, maxval=580)
+limiteLiquidadas = input.int(3, "Límite Liquidadas", minval=0, maxval=250)
+
+// ========================
+// COLORES RAINBOW ULTRA CYBERPUNK
+// ========================
+colorRainbow1 = #FF0000    // 🔴 Rojo intenso
+colorRainbow2 = #FF3300    // 🟠 Naranja rojizo
+colorRainbow3 = #FF6600    // 🟠 Naranja puro
+colorRainbow4 = #FF9900    // 🟡 Naranja amarillo
+colorRainbow5 = #FFCC00    // 🟡 Amarillo brillante
+colorRainbow6 = #00FF00    // 🟢 Verde neón
+colorRainbow7 = #00FF99    // 🟢 Verde agua
+colorRainbow8 = #00FFFF    // 🔵 Cian eléctrico
+colorRainbow9 = #0066FF    // 🔵 Azul claro
+colorRainbow10 = #0000FF   // 🔵 Azul intenso
+colorRainbow11 = #6600FF   // 🟣 Azul violeta
+colorRainbow12 = #CC00FF   // 🟣 Violeta neón
+colorRainbow13 = #FF00FF   // 🟣 Magenta fluorescente
+colorRainbow14 = #FF0099   // 🟣 Rosa intenso
+
+colorTransparente  = color.new(#ffffff, 100)
+
+// ========================
+// VARIABLES GLOBALES OFERTA/DEMANDA
+// ========================
+var array<box> arrayCajaOferta            = array.new<box>()
+var array<line> arrayLineaOferta          = array.new<line>()
+var array<box> arrayCajaOfertaAnt         = array.new<box>()
+var array<line> arrayLineaOfertaAnt       = array.new<line>()
+var array<label> arrayEtiquetaOfertaAnt   = array.new<label>()
+
+var array<box> arrayCajaDemanda           = array.new<box>()
+var array<line> arrayLineaDemanda         = array.new<line>()
+var array<box> arrayCajaDemandaAnt        = array.new<box>()
+var array<line> arrayLineaDemandaAnt      = array.new<line>()
+var array<label> arrayEtiquetaDemandaAnt  = array.new<label>()
+
+// Array de colores rainbow para rotación
+var array<color> coloresRainbow = array.from(colorRainbow1, colorRainbow2, colorRainbow3, colorRainbow4, colorRainbow5, colorRainbow6, colorRainbow7, colorRainbow8, colorRainbow9, colorRainbow10, colorRainbow11, colorRainbow12, colorRainbow13, colorRainbow14)
+
+var int indiceColorOferta = 0
+var int indiceColorDemanda = 7
+
+// ========================
+// FUNCIONES CYBERPUNK RAINBOW
+// ========================
+brillo_osc = math.sin(bar_index * 0.1)
+brillo_alpha(a) => math.round(a * 60 + 50)
+
+// Función para efecto arcoíris dinámico
+get_rainbow_color(index, offset) =>
+    colors = array.from(colorRainbow1, colorRainbow2, colorRainbow3, colorRainbow4, colorRainbow5, 
+                       colorRainbow6, colorRainbow7, colorRainbow8, colorRainbow9, colorRainbow10,
+                       colorRainbow11, colorRainbow12, colorRainbow13, colorRainbow14)
+    array.get(colors, (index + offset) % array.size(colors))
+
+// ========================
+// MA IRCA CYBERPUNK OPTIMIZADA
+// ========================
+wma = ta.wma(close, 18)
+wma1 = ta.wma(close, 1)
+rangoMax = 32
+rangoMin = 9
+simetria = 1.0
+
+max_val = ta.highest(wma, rangoMax)
+min_val = ta.lowest(wma, rangoMin)
+centro = (max_val + min_val) / 2
+wma_invertida = centro + (centro - wma) * simetria
+arribaInv = wma_invertida > wma
+
+// Plot con colores rainbow dinámicos
+color_wma1 = get_rainbow_color(bar_index, 0)
+color_wma_invertida = arribaInv ? get_rainbow_color(bar_index, 7) : get_rainbow_color(bar_index, 12)
+
+plot(wma1, color=color.new(color_wma1, 80), linewidth=3)
+plot(wma_invertida, color=color.new(color_wma_invertida, 10), linewidth=3, linestyle=plot.linestyle_dotted)
+
+// SMAs con colores rainbow complementarios
+sma36 = ta.sma(close, 36)
+sma37 = ta.sma(close, 37)
+plot(sma36, color=color.new(get_rainbow_color(bar_index, 4), 10), linewidth=3)
+plot(sma37, color=color.new(get_rainbow_color(bar_index, 9), 10), linewidth=3)
+
+// ========================
+// BLOQUES DE ORDEN RAINBOW ULTRA
+// ========================
+longitud_ob = input.int(5, "Velas para Bloque de Orden", minval=1, maxval=10)
+
+// Detección corregida de order blocks
+alcista_ob = false
+bajista_ob = false
+
+if bar_index >= longitud_ob
+    // Bloque alcista: primera vela bajista, luego velas alcistas
+    es_bajista_inicial = close[longitud_ob] < open[longitud_ob]
+    velas_alcistas = true
+    for i = 1 to longitud_ob - 1
+        velas_alcistas := velas_alcistas and close[longitud_ob - i] > open[longitud_ob - i]
+    alcista_ob := es_bajista_inicial and velas_alcistas
+    
+    // Bloque bajista: primera vela alcista, luego velas bajistas
+    es_alcista_inicial = close[longitud_ob] > open[longitud_ob]
+    velas_bajistas = true
+    for i = 1 to longitud_ob - 1
+        velas_bajistas := velas_bajistas and close[longitud_ob - i] < open[longitud_ob - i]
+    bajista_ob := es_alcista_inicial and velas_bajistas
+
+// Variables para rotación de colores en order blocks
+var int ob_color_index_alcista = 0
+var int ob_color_index_bajista = 7
+
+// Limitar cajas a las últimas 100 barras para rendimiento
+recent_bars = 100
+if bar_index >= recent_bars
+    if alcista_ob
+        color_alcista = get_rainbow_color(ob_color_index_alcista, 0)
+        box.new(bar_index - longitud_ob, high[longitud_ob], bar_index, low[longitud_ob], 
+               bgcolor=color.new(color_alcista, 60), 
+               border_color=color.new(color_alcista, 90),
+               border_width=2)
+        ob_color_index_alcista := (ob_color_index_alcista + 1) % 14
+        
+    if bajista_ob
+        color_bajista = get_rainbow_color(ob_color_index_bajista, 0)
+        box.new(bar_index - longitud_ob, high[longitud_ob], bar_index, low[longitud_ob], 
+               bgcolor=color.new(color_bajista, 60), 
+               border_color=color.new(color_bajista, 90),
+               border_width=2)
+        ob_color_index_bajista := (ob_color_index_bajista + 1) % 14
+
+// ========================
+// DETECCIÓN DE OFERTA CON COLORES RAINBOW
+// ========================
+_maximoOferta = ta.highest(high, periodosOferta)
+_minimoDemanda = ta.lowest(low, periodosDemanda)
+
+volumenOferta  = volume
+volumenDemanda = volume
+
+velaDerechaOferta = open[3] < close[3]
+esOferta = velaDerechaOferta and (close[1] < close[2]) and (close[2] < close[3])
+
+if esOferta and (ta.barssince(esOferta[1]) > 3 or na(ta.barssince(esOferta[1])))
+    // Color rainbow dinámico para oferta
+    colorOfertaActual = get_rainbow_color(indiceColorOferta, 0)
+    indiceColorOferta := (indiceColorOferta + 1) % array.size(coloresRainbow)
+    
+    colorOfertaBg = color.new(colorOfertaActual, 85)
+    colorOfertaBorder = color.new(colorOfertaActual, 70)
+    
+    cajaOferta = box.new(bar_index[3], _maximoOferta, bar_index, low[3], border_color=colorOfertaBorder, border_width=2, border_style=line.style_solid, extend=extend.right, bgcolor=colorOfertaBg)
+    array.push(arrayCajaOferta, cajaOferta)
+
+    if mostrarVolumen
+        label.new(bar_index[3], _maximoOferta, str.tostring(volumenOferta, format.percent), 
+                 yloc=yloc.price, color=colorTransparente, style=label.style_label_left, 
+                 textcolor=colorOfertaActual, size=size.tiny)
+
+    if volumenOferta >= umbralVolumen
+        box.set_bgcolor(cajaOferta, color.new(colorRainbow5, 75))
+
+    liquidacionOferta = nivelLiquidacion == "equilibrio" ? _maximoOferta : na
+
+    lineaOferta = line.new(bar_index[3], liquidacionOferta, bar_index, liquidacionOferta, 
+                          extend=extend.none, 
+                          color=nivelLiquidacion == "equilibrio" ? colorTransparente : colorOfertaActual, 
+                          style=line.style_dashed, width=2)
+    array.push(arrayLineaOferta, lineaOferta)
+
+    if array.size(arrayCajaOferta) > limiteActivas
+        box.delete(array.shift(arrayCajaOferta))
+        line.delete(array.shift(arrayLineaOferta))
+
+// Lógica de liquidación para oferta
+if array.size(arrayCajaOferta) > 0
+    i = 0
+    while i < array.size(arrayCajaOferta)
+        idLinea = array.get(arrayLineaOferta, i)
+        idCaja  = array.get(arrayCajaOferta, i)
+        parteSuperiorCaja = box.get_top(idCaja)
+        parteInferiorCaja = box.get_bottom(idCaja)
+        nivelYLinea = line.get_y1(idLinea)
+
+        if high >= nivelYLinea
+            box.delete(array.get(arrayCajaOferta, i))
+            line.delete(array.get(arrayLineaOferta, i))
+            array.remove(arrayCajaOferta, i)
+            array.remove(arrayLineaOferta, i)
+        else
+            if high >= parteInferiorCaja
+                cajaOfertaLiquidad = box.new(box.get_left(idCaja), parteSuperiorCaja, bar_index, parteInferiorCaja, border_color=color.new(colorRainbow13, 30), border_width=1, border_style=line.style_dashed, extend=extend.none, bgcolor=color.new(colorRainbow13, 95))
+                lineaOfertaLiquidad = line.new(line.get_x1(idLinea), nivelYLinea, bar_index, nivelYLinea, 
+                                              extend=extend.none, color=color.new(colorRainbow13, 20), 
+                                              style=line.style_dotted, width=2)
+                etiquetaOfertaLiquidad = label.new(bar_index, nivelYLinea, "LIQ", 
+                                                  yloc=yloc.price, color=colorTransparente, 
+                                                  style=label.style_label_down, 
+                                                  textcolor=color.new(colorRainbow13, 60), size=size.small)
+
+                box.delete(idCaja)
+                line.delete(idLinea)
+                array.push(arrayCajaOfertaAnt, cajaOfertaLiquidad)
+                array.push(arrayLineaOfertaAnt, lineaOfertaLiquidad)
+                array.push(arrayEtiquetaOfertaAnt, etiquetaOfertaLiquidad)
+                array.remove(arrayCajaOferta, i)
+                array.remove(arrayLineaOferta, i)
+
+                if array.size(arrayCajaOfertaAnt) > limiteLiquidadas
+                    box.delete(array.shift(arrayCajaOfertaAnt))
+                    line.delete(array.shift(arrayLineaOfertaAnt))
+                    label.delete(array.shift(arrayEtiquetaOfertaAnt))
+            else
+                box.set_right(idCaja, bar_index)
+                line.set_x2(idLinea, bar_index)
+                i += 1
+
+// ========================
+// DETECCIÓN DE DEMANDA CON COLORES RAINBOW
+// ========================
+velaDerechaDemanda = open[3] > close[3]
+esDemanda = velaDerechaDemanda and (close[1] > close[2]) and (close[2] > close[3])
+
+if esDemanda and (ta.barssince(esDemanda[1]) > 3 or na(ta.barssince(esDemanda[1])))
+    // Color rainbow dinámico para demanda
+    colorDemandaActual = get_rainbow_color(indiceColorDemanda, 0)
+    indiceColorDemanda := (indiceColorDemanda + 1) % array.size(coloresRainbow)
+    
+    colorDemandaBg = color.new(colorDemandaActual, 85)
+    colorDemandaBorder = color.new(colorDemandaActual, 70)
+    
+    cajaDemanda = box.new(bar_index[3], high[3], bar_index, _minimoDemanda, 
+                         border_color=colorDemandaBorder, border_width=2, 
+                         border_style=line.style_solid, extend=extend.right, 
+                         bgcolor=colorDemandaBg)
+    array.push(arrayCajaDemanda, cajaDemanda)
+
+    if mostrarVolumen
+        label.new(bar_index[3], high[3], str.tostring(volumenDemanda, format.percent), 
+                 yloc=yloc.price, color=colorTransparente, style=label.style_label_left, 
+                 textcolor=colorDemandaActual, size=size.tiny)
+
+    if volumenDemanda >= umbralVolumen
+        box.set_bgcolor(cajaDemanda, color.new(colorRainbow11, 75))
+
+    liquidacionDemanda = nivelLiquidacion == "equilibrio" ? _minimoDemanda : na
+
+    lineaDemanda = line.new(bar_index[3], liquidacionDemanda, bar_index, liquidacionDemanda, 
+                           extend=extend.none, 
+                           color=nivelLiquidacion == "equilibrio" ? colorTransparente : colorDemandaActual, 
+                           style=line.style_dashed, width=2)
+    array.push(arrayLineaDemanda, lineaDemanda)
+
+    if array.size(arrayCajaDemanda) > limiteActivas
+        box.delete(array.shift(arrayCajaDemanda))
+        line.delete(array.shift(arrayLineaDemanda))
+
+// Lógica de liquidación para demanda
+if array.size(arrayCajaDemanda) > 0
+    i = 0
+    while i < array.size(arrayCajaDemanda)
+        idLinea = array.get(arrayLineaDemanda, i)
+        idCaja  = array.get(arrayCajaDemanda, i)
+        parteSuperiorCaja = box.get_top(idCaja)
+        parteInferiorCaja = box.get_bottom(idCaja)
+        nivelYLinea = line.get_y1(idLinea)
+
+        if low <= nivelYLinea
+            box.delete(array.get(arrayCajaDemanda, i))
+            line.delete(array.get(arrayLineaDemanda, i))
+            array.remove(arrayCajaDemanda, i)
+            array.remove(arrayLineaDemanda, i)
+        else
+            if low <= parteSuperiorCaja
+                cajaDemandaLiquidad = box.new(box.get_left(idCaja), parteSuperiorCaja, bar_index, parteInferiorCaja, 
+                                             border_color=color.new(colorRainbow12, 30), border_width=1, 
+                                             border_style=line.style_dashed, extend=extend.none, 
+                                             bgcolor=color.new(colorRainbow12, 95))
+                lineaDemandaLiquidad = line.new(line.get_x1(idLinea), nivelYLinea, bar_index, nivelYLinea, 
+                                               extend=extend.none, color=color.new(colorRainbow12, 20), 
+                                               style=line.style_dotted, width=2)
+                etiquetaDemandaLiquidad = label.new(bar_index, nivelYLinea, "LIQ", 
+                                                   yloc=yloc.price, color=colorTransparente, 
+                                                   style=label.style_label_up, 
+                                                   textcolor=color.new(colorRainbow12, 60), size=size.small)
+
+                box.delete(idCaja)
+                line.delete(idLinea)
+                array.push(arrayCajaDemandaAnt, cajaDemandaLiquidad)
+                array.push(arrayLineaDemandaAnt, lineaDemandaLiquidad)
+                array.push(arrayEtiquetaDemandaAnt, etiquetaDemandaLiquidad)
+                array.remove(arrayCajaDemanda, i)
+                array.remove(arrayLineaDemanda, i)
+
+                if array.size(arrayCajaDemandaAnt) > limiteLiquidadas
+                    box.delete(array.shift(arrayCajaDemandaAnt))
+                    line.delete(array.shift(arrayLineaDemandaAnt))
+                    label.delete(array.shift(arrayEtiquetaDemandaAnt))
+            else
+                box.set_right(idCaja, bar_index)
+                line.set_x2(idLinea, bar_index)
+                i += 1
+
+// ========================
+// CRUCES Y ALERTAS CYBERPUNK
+// ========================
+cruce_sma36_arriba = ta.crossover(wma_invertida, sma36)
+cruce_sma36_abajo = ta.crossunder(wma_invertida, sma36)
+cruce_sma37_arriba = ta.crossover(wma_invertida, sma37)
+cruce_sma37_abajo = ta.crossunder(wma_invertida, sma37)
+
+// Alertas combinadas
+proximidad_bo = alcista_ob or alcista_ob[1] or bajista_ob or bajista_ob[1]
+cruce_importante = cruce_sma36_arriba or cruce_sma36_abajo or cruce_sma37_arriba or cruce_sma37_abajo
+
+// Fondos de alerta con efectos rainbow
+bgcolor(proximidad_bo ? color.new(colorRainbow4, 90) : na)
+bgcolor(cruce_importante ? color.new(colorRainbow12, 80) : na)
+
+// ========================
+// EFECTO PULSO RAINBOW FINAL
+// ========================
+es_vela_importante = math.abs(close - open) > ta.atr(14) * 1.5
+color_pulso = get_rainbow_color(bar_index, math.round(brillo_osc * 14))
+
+bgcolor(es_vela_importante ? color.new(color_pulso, 30) : na, title="Fondo vela importante")
