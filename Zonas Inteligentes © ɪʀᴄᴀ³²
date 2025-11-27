@@ -72,7 +72,7 @@ esDemanda = velaDerechaDemanda and (close[1] > close[2]) and (close[2] > close[3
 // GESTIÓN DE OFERTA
 // ========================
 
-if esOferta and nz(ta.barssince(esOferta[1])) > 3
+if esOferta and not na(ta.barssince(esOferta[1])) and ta.barssince(esOferta[1]) > 3
     // Crear caja de oferta
     cajaOferta = box.new(bar_index[3], _maximoOferta, bar_index, low[3], border_color=colorOfertaLiq, border_width=1, border_style=line.style_solid, extend=extend.right, xloc=xloc.bar_index, bgcolor=colorOferta)
     array.push(arrayCajaOferta, cajaOferta)
@@ -146,7 +146,7 @@ if array.size(arrayCajaOferta) > 0
 // GESTIÓN DE DEMANDA
 // ========================
 
-if esDemanda and nz(ta.barssince(esDemanda[1])) > 3
+if esDemanda and not na(ta.barssince(esDemanda[1])) and ta.barssince(esDemanda[1]) > 3
     // Crear caja de demanda
     cajaDemanda = box.new(bar_index[3], high[3], bar_index, _minimoDemanda, 
                          border_color=colorDemandaLiq, border_width=1, 
@@ -221,31 +221,7 @@ if array.size(arrayCajaDemanda) > 0
             // Extender demanda activa
             box.set_right(idCaja, bar_index)
             line.set_x2(idLinea, bar_index)
-
-// ========================
-// INDICADORES TÉCNICOS
-// ========================
-
-// WMA Invertida
-wma = ta.wma(close, 18)
-wma00 = ta.wma(close, 1)
-
-rangoMax = 32
-rangoMin = 9
-simetria = 1.0
-
-max_val = ta.highest(wma, rangoMax)
-min_val = ta.lowest(wma, rangoMin)
-centro = (max_val + min_val) / 2
-
-wma_invertida = centro + (centro - wma) * simetria
-arribaInv = wma_invertida > wma
-color_inv = arribaInv ? color.new(#FF0033, 0) : color.new(#007BFF, 0)
-
-// Medias Móviles Simples
-sma36 = ta.sma(close, 36)
-sma37 = ta.sma(close, 37)
-
+            
 // =============================
 // 1. PALETA BASE (NEÓN)
 // =============================
