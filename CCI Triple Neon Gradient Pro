@@ -1,0 +1,99 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32
+
+//@version=6
+indicator("CCI Triple Neon Gradient Pro", overlay=false, max_lines_count=500, max_bars_back=5000)
+
+// =============================
+// INPUTS
+// =============================
+len1 = input.int(14, "CCI Rápido", minval=5, maxval=50, group="Períodos CCI")
+len2 = input.int(28, "CCI Medio", minval=10, maxval=100, group="Períodos CCI")
+len3 = input.int(56, "CCI Lento", minval=20, maxval=200, group="Períodos CCI")
+
+showGlow     = input.bool(true,  "Mostrar Glow", group="Efectos Visuales")
+glowStrength = input.int(30, "Fuerza Glow", minval=0, maxval=100, group="Efectos Visuales")
+showAreas    = input.bool(true,  "Mostrar Áreas", group="Efectos Visuales")
+areaTransp  = input.int(82, "Transparencia Áreas", minval=0, maxval=100, group="Efectos Visuales")
+showLevels  = input.bool(true,  "Mostrar Niveles", group="Efectos Visuales")
+showSignals = input.bool(true,  "Mostrar Señales", group="Señales")
+alertMode   = input.bool(false, "Activar Alertas", group="Alertas")
+
+// =============================
+// UTILIDADES
+// =============================
+clamp(x, lo, hi) => math.min(math.max(x, lo), hi)
+
+// =============================
+// GRADIENTE NEÓN
+// =============================
+neon_colors = array.from(
+    color.rgb(216, 0, 255),
+    color.rgb(255, 0, 0),
+    color.rgb(255, 140, 0),
+    color.rgb(255, 215, 0),
+    color.rgb(0, 255, 0),
+    color.rgb(204, 255, 0)
+)
+
+f_ccicolor(cci) =>
+    norm = clamp((cci + 300) / 600, 0.0, 1.0)
+    pos  = norm * 5
+    idx  = math.min(int(math.floor(pos)), 4)
+    t    = pos - idx
+
+    cA = array.get(neon_colors, idx)
+    cB = array.get(neon_colors, idx + 1)
+
+    r = int(math.round(color.r(cA) + (color.r(cB) - color.r(cA)) * t))
+    g = int(math.round(color.g(cA) + (color.g(cB) - color.g(cA)) * t))
+    b = int(math.round(color.b(cA) + (color.b(cB) - color.b(cA)) * t))
+
+    color.rgb(r, g, b)
+
+// =============================
+// CCI
+// =============================
+cci1 = ta.cci(close, len1)
+cci2 = ta.cci(close, len2)
+cci3 = ta.cci(close, len3)
+
+col1 = f_ccicolor(cci1)
+col2 = f_ccicolor(cci2)
+col3 = f_ccicolor(cci3)
+
+// =============================
+// GLOW
+// =============================
+outerTransp = clamp(120 - glowStrength, 0, 100)
+
+plot(cci1, color=showGlow ? color.new(col1, outerTransp) : na, linewidth=3)
+plot(cci2, color=showGlow ? color.new(col2, outerTransp) : na, linewidth=4)
+plot(cci3, color=showGlow ? color.new(col3, outerTransp) : na, linewidth=5)
+
+// =============================
+// LÍNEAS
+// =============================
+p1 = plot(cci1, "CCI Rápido",   color=col1, linewidth=2)
+p2 = plot(cci2, "CCI Medio", color=col2, linewidth=3)
+p3 = plot(cci3, "CCI Lento",   color=col3, linewidth=4)
+
+// =============================
+// ÁREAS
+// =============================
+fill(p1, p2, color=showAreas ? color.new(col1, areaTransp) : na)
+fill(p2, p3, color=showAreas ? color.new(col2, areaTransp) : na)
+fill(p1, p3, color=showAreas ? color.new(col3, areaTransp) : na)
+
+// =============================
+// NIVELES
+// =============================
+hline( 400,  "Extremo Ultra +", color=showLevels ? color.new(#FF00FF, 40) : na, linestyle=hline.style_solid)
+hline( 300,  "Extremo +", color=showLevels ? color.new(#FF00FF, 40) : na, linestyle=hline.style_dotted)
+hline( 200,  "Sobrecompra Fuerte", color=showLevels ? color.new(#FF0000, 50) : na)
+hline( 100,  "Sobrecompra", color=showLevels ? color.new(#FFA500, 60) : na)
+hline(   0,  "Cero", color=showLevels ? color.new(#00FFFF, 70) : na, linestyle=hline.style_dashed)
+hline(-100,  "Sobreventa", color=showLevels ? color.new(#00FF00, 60) : na)
+hline(-200,  "Sobreventa Fuerte", color=showLevels ? color.new(#800080, 50) : na)
+hline(-300,  "Extremo -", color=showLevels ? color.new(#4B0082, 40) : na, linestyle=hline.style_dotted)
+hline(-400,  "Extremo Ultra-", color=showLevels ? color.new(#4B0082, 40) : na, linestyle=hline.style_solid)
