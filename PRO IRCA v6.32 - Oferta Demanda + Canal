@@ -1,8 +1,8 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+// © lrca32 v6.32
 
 //@version=6
-indicator("PRO IRCA v6 - Oferta Demanda + Canal", overlay=true, max_bars_back=5000, max_polylines_count=100, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
+indicator("PRO IRCA v6.32 - Oferta/Demanda + Canal", overlay=true, max_bars_back=5000, max_polylines_count=100, max_lines_count=500, max_labels_count=500, max_boxes_count=500)
 
 // ============================================
 // SECCIÓN 1: CONFIGURACIÓN DE OFERTA/DEMANDA
@@ -263,12 +263,12 @@ if array.size(arrayCajaDemanda) > 0
 // --------------------------
 // PALETA DE COLORES NEÓN
 // --------------------------
-color0 = color.new(#D800FF, 0) // Morado neón (-300)
-color1 = color.new(#FF0000, 0) // Rojo neón
-color2 = color.new(#FF8C00, 0) // Naranja neón
-color3 = color.new(#FFD700, 0) // Amarillo neón
-color4 = color.new(#00FF00, 0) // Verde neón
-color5 = color.new(#CCFF00, 0) // Lima neón (+300)
+color0 = color.new(#FF00BB, 0) // Morado neón (-300)
+color1 = color.new(#FF003C, 0) // Rojo neón
+color2 = color.new(#FF4400, 0) // Naranja neón
+color3 = color.new(#91FF00, 0) // Amarillo neón
+color4 = color.new(#11FF00, 0) // Verde neón
+color5 = color.new(#00FF6F, 0) // Lima neón (+300)
 
 // --------------------------
 // FUNCIÓN: MEZCLA DE COLORES RGB
@@ -317,19 +317,19 @@ barcolor(color.new(colorVela, 0))
 mostrarCanal = input.bool(true, "Mostrar Canal", group="Canal de Tendencia")
 anchoCanal = input.float(3, "Ancho del Canal", step=0.1, group="Canal de Tendencia")
 mostrarBreakouts = input.bool(true, "Mostrar Breakouts", group="Canal de Tendencia")
-colorAlcista = input.color(color.lime, "", inline="colores", group="Canal de Tendencia")
-colorBajista = input.color(color.red, "", inline="colores", group="Canal de Tendencia")
+colorAlcista = input.color(color.rgb(54, 195, 3), "", inline="colores", group="Canal de Tendencia")
+colorBajista = input.color(color.rgb(295, 3, 54), "", inline="colores", group="Canal de Tendencia")
 
 // Perfil de Volumen
 mostrarPerfil = input.bool(true, "Mostrar", inline="perfil", group="Perfil de Volumen")
 longitudMinima = input.int(10, "Longitud Mínima", minval=10, group="Perfil de Volumen")
 transparencia = input.int(65, "Transparencia", group="Perfil de Volumen")
-colorAlcistaVP = input.color(color.green, "", inline="perfil", group="Perfil de Volumen")
-colorBajistaVP = input.color(color.red, "", inline="perfil", group="Perfil de Volumen")
+colorAlcistaVP = input.color(color.rgb(56, 222, 27), "", inline="perfil", group="Perfil de Volumen")
+colorBajistaVP = input.color(color.rgb(222, 27, 29), "", inline="perfil", group="Perfil de Volumen")
 
 // POC (Punto de Control)
 mostrarPOC = input.bool(true, "POC", inline="poc", group="Perfil de Volumen")
-colorPOC = input.color(color.orange, "", inline="poc", group="Perfil de Volumen")
+colorPOC = input.color(color.rgb(27, 56, 222), "", inline="poc", group="Perfil de Volumen")
 
 // --------------------------
 // VARIABLES DEL CANAL
@@ -377,9 +377,9 @@ if promedio == promedio[1]
 if promedio != promedio[1]
     if mostrarBreakouts
         if promedio > promedio[1]
-            label.new(bar_index, base[1], "▲", color=color(na), style=label.style_label_up, textcolor=color.lime)
+            label.new(bar_index, base[1], "▲", color=color(na), style=label.style_label_up, textcolor=color.rgb(56, 222, 27))
         else
-            label.new(bar_index, tope[1], "▼", color=color(na), style=label.style_label_down, textcolor=color.red)
+            label.new(bar_index, tope[1], "▼", color=color(na), style=label.style_label_down, textcolor=color.rgb(222, 27, 56))
 
     if contador > longitudMinima
         if mostrarCanal
