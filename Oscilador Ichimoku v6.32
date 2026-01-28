@@ -1,48 +1,45 @@
 // This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © incognito32irca // © ɪʀᴄᴀ³² // © pingctm_csgo
+// © lrca32 v6.32
 
 //@version=6
-indicator(title="Oscilador Ichimoku LED", explicit_plot_zorder = true)
+indicator(title="Oscilador Ichimoku v6.32", explicit_plot_zorder = true)
 
 //───────────────────────
 // CONFIGURACIÓN
 //───────────────────────
-conversionPeriods   = input.int(8,  minval=1, title="Longitud Línea de Conversión", group="Configuración")
-basePeriods         = input.int(13, minval=1, title="Longitud Línea Base", group="Configuración")
+conversionPeriods   = input.int(14,  minval=1, title="Longitud Línea de Conversión", group="Configuración")
+basePeriods         = input.int(20, minval=1, title="Longitud Línea Base", group="Configuración")
 laggingSpan2Periods = input.int(26, minval=1, title="Longitud Span B", group="Configuración")
-displacement        = input.int(13, minval=1, title="Desplazamiento", group="Configuración")
+displacement        = input.int(14, minval=1, title="Desplazamiento", group="Configuración")
 
 useatr = input.bool(true, title="Usar ATR", tooltip="Protección contra whipsaw", group="Configuración")
-atrlen = input.int(9, title="  Longitud", minval=1, group="Configuración")
+atrlen = input.int(10, title="  Longitud", minval=1, group="Configuración")
 atrmul = input.float(2.0, title="  Multiplicador", minval=0.1, step=0.1, group="Configuración")
 
 bounceoff = input.bool(false, title="Rebote en Soporte/Resistencia", group="Configuración")
 
 useema = input.bool(true, title="Mostrar EMA", group="Configuración")
-emalen = input.int(9, title="  Longitud", minval=1, group="Configuración")
-emacol = input.color(#0066ff, title="  Color EMA", group="Configuración")
+emalen = input.int(10, title="  Longitud", minval=1, group="Configuración")
+emacol = input.color(#003cff, title="  Color EMA", group="Configuración")
 emawd  = input.int(1, title="  Grosor EMA", minval=1, maxval=5, group="Configuración")
 
 //───────────────────────
 // COLORES LED / NEÓN
 //───────────────────────
-entexlongcol  = input.color(color.rgb(0,255,180), title="Entrada Long", inline="ent", group="Colores")
-entexshortcol = input.color(color.rgb(255,80,80), title="Entrada Short", inline="ent", group="Colores")
-
 coloredbg = input.bool(true, title="Fondo Tendencia", group="Colores")
 bgcolupI  = input.string("Green", title="  Fondo Alcista", options=["Green","Red","Blue"], group="Colores")
 bgcoldnI  = input.string("Red",   title="  Fondo Bajista", options=["Green","Red","Blue"], group="Colores")
 bgtransp = input.int(85, title="  Transparencia Fondo", minval=0, maxval=100, group="Colores")
 
-upcol1 = input.color(color.rgb(0, 255, 119, 40), title="Alcista 1", inline="up", group="Colores")
-upcol2 = input.color(color.rgb(0,220,100, 40), title="Alcista 2", inline="up", group="Colores")
-upcol3 = input.color(color.rgb(0,170,80, 40),  title="Alcista 3", inline="up", group="Colores")
-upcol4 = input.color(color.rgb(0,120,60, 40),  title="Alcista 4", inline="up", group="Colores")
+upcol1 = input.color(color.rgb(60, 255, 0, 40), title="Alcista 1", inline="up", group="Colores")
+upcol2 = input.color(color.rgb(60,255,0, 60), title="Alcista 2", inline="up", group="Colores")//42,166,62, 40
+upcol3 = input.color(color.rgb(1,102,48, 10),  title="Alcista 3", inline="up", group="Colores")
+upcol4 = input.color(color.rgb(3,46,21, 30),  title="Alcista 4", inline="up", group="Colores")
 
-dbcol1 = input.color(color.rgb(255,60,60, 40), title="Bajista 1", inline="dn", group="Colores")
-dbcol2 = input.color(color.rgb(220,50,50, 40), title="Bajista 2", inline="dn", group="Colores")
-dbcol3 = input.color(color.rgb(170,40,40, 40), title="Bajista 3", inline="dn", group="Colores")
-dbcol4 = input.color(color.rgb(120,30,30, 40), title="Bajista 4", inline="dn", group="Colores")
+dbcol1 = input.color(color.rgb(255,0,60, 40), title="Bajista 1", inline="dn", group="Colores")
+dbcol2 = input.color(color.rgb(255,0,60, 60), title="Bajista 2", inline="dn", group="Colores")
+dbcol3 = input.color(color.rgb(159,7,18, 10), title="Bajista 3", inline="dn", group="Colores")
+dbcol4 = input.color(color.rgb(70,8,9, 30), title="Bajista 4", inline="dn", group="Colores")
 
 // Zona neutra → INVISIBLE
 inSRcolor = color.new(color.white, 100)
@@ -92,7 +89,7 @@ cloud = ConvBase + (mtrend == 1 ? math.max(leadLine1 - leadLine2, 0) : math.min(
 //───────────────────────
 plot(cloud,    color=mtrend==1?upcol4:dbcol4, style=plot.style_line)
 plot(ConvBase, color=ConvBaseColor, style=plot.style_histogram)
-plot(Lagging,  color=mtrend==1?upcol2:dbcol2, style=plot.style_histogram)
+plot(Lagging,  color=mtrend==1?upcol2:dbcol2, style=plot.style_columns)
 plot(Oscline,  color=Osccolor, style=plot.style_areabr)
 
 // EMA
