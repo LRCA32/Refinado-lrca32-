@@ -1,0 +1,95 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32 v6.32
+
+//@version=6
+indicator("CCI Triple Neón v6.32", overlay=false, max_lines_count=500)
+
+//━━━━━━━━━━━━━━━
+// INPUTS
+//━━━━━━━━━━━━━━━
+len1 = input.int(14, "CCI 1")
+len2 = input.int(20, "CCI 2")
+len3 = input.int(26, "CCI 3")
+
+glowStrength = input.int(40, "Fuerza Glow", minval=0, maxval=100)
+areaTransp   = input.int(77, "Transparencia Áreas", minval=0, maxval=100)
+
+//━━━━━━━━━━━━━━━
+// FUNCIONES
+//━━━━━━━━━━━━━━━
+clamp(x, lo, hi) =>
+    math.min(math.max(x, lo), hi)
+
+// Gradiente
+neon_colors = array.from(
+    color.rgb(162, 0, 255),// 🟣 Violeta
+    color.rgb(255, 0, 60),// 🔴 Rojo
+    color.rgb(255, 153, 0),// 🟠 Naranja
+    color.rgb(145, 255, 0),// 🟡 Amarillo
+    color.rgb(60, 255, 0),// 🟢 Lima
+    color.rgb(0, 255, 98)// 🟢 Verde
+)
+
+f_ccicolor(cci) =>
+    norm = clamp((cci + 300.0) / 600.0, 0.0, 1.0)
+    pos  = norm * 5
+    idx  = math.min(int(pos), 4)
+    t    = pos - idx
+
+    cA = array.get(neon_colors, idx)
+    cB = array.get(neon_colors, idx + 1)
+
+    r = int(color.r(cA) + (color.r(cB) - color.r(cA)) * t)
+    g = int(color.g(cA) + (color.g(cB) - color.g(cA)) * t)
+    b = int(color.b(cA) + (color.b(cB) - color.b(cA)) * t)
+
+    color.rgb(r, g, b)
+
+//━━━━━━━━━━━━━━━
+// CCI
+//━━━━━━━━━━━━━━━
+cci1 = ta.cci(close, len1)
+cci2 = ta.cci(close, len2)
+cci3 = ta.cci(close, len3)
+
+//━━━━━━━━━━━━━━━
+// COLORES DINÁMICOS
+//━━━━━━━━━━━━━━━
+col1 = f_ccicolor(cci1)
+col2 = f_ccicolor(cci2)
+col3 = f_ccicolor(cci3)
+
+// Glow
+innerT = clamp(100 - glowStrength, 0, 100)
+outerT = clamp(120 - glowStrength, 0, 100)
+
+glow1 = color.new(col1, outerT)
+glow2 = color.new(col2, outerT)
+glow3 = color.new(col3, outerT)
+
+//━━━━━━━━━━━━━━━
+// PLOTS
+//━━━━━━━━━━━━━━━
+plot(cci1, "CCI1 Glow", color=glow1, linewidth=5, style=plot.style_histogram)
+plot(cci2, "CCI2 Glow", color=glow2, linewidth=5, style=plot.style_histogram)
+plot(cci3, "CCI3 Glow", color=glow3, linewidth=5, style=plot.style_histogram)
+
+p1 = plot(cci1, "CCI1", color=col1, linewidth=1)
+p2 = plot(cci2, "CCI2", color=col2, linewidth=2)
+p3 = plot(cci3, "CCI3", color=col3, linewidth=3)
+
+// Áreas
+fill(p1, p2, color=color.new(col1, areaTransp))
+fill(p2, p3, color=color.new(col2, areaTransp))
+fill(p1, p3, color=color.new(col3, areaTransp))
+
+//━━━━━━━━━━━━━━━
+// NIVELES
+//━━━━━━━━━━━━━━━
+hline(300,  "300",  color=color.new(color.red, 50),  linestyle=hline.style_solid)
+hline(200,  "200",  color=color.new(color.red, 50),  linestyle=hline.style_dashed)
+hline(100,  "100",  color=color.new(color.orange, 60), linestyle=hline.style_dotted)
+hline(0,    "0",    color=color.new(color.aqua, 70))
+hline(-100, "-100", color=color.new(color.lime, 60), linestyle=hline.style_dotted)
+hline(-200, "-200", color=color.new(color.red, 50),  linestyle=hline.style_dashed)
+hline(-300, "-300", color=color.new(color.red, 50),  linestyle=hline.style_solid)
