@@ -1,0 +1,129 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32 
+
+//@version=6
+indicator("Order Blocks Línea ※"
+  , overlay = true
+  , max_lines_count = 500)
+
+//------------------------------------------------------------------------------
+// Ajustes
+//-----------------------------------------------------------------------------{
+length = input.int(5, 'Longitud del pivote de volumen', minval = 1)
+
+// Alcistas
+bull_ext_last = input.int(3, 'OB Alcista – cantidad a extender', minval = 1, inline = 'bull')
+bull_avg_css = input.color(color.rgb(43, 76, 255, 0), 'Línea media +OB', inline = 'bull')
+
+// Bajistas
+bear_ext_last = input.int(3, 'OB Bajista – cantidad a extender', minval = 1, inline = 'bear')
+bear_avg_css = input.color(color.rgb(255, 43, 76, 40), 'Línea media -OB', inline = 'bear')
+
+// Estilo de línea media
+line_width = input.int(1, 'Grosor de línea media', minval = 1)
+
+// Método de mitigación
+mitigation = input.string('Wick', 'Método de mitigación', options = ['Wick', 'Close'])
+//-----------------------------------------------------------------------------}
+// Funciones
+//-----------------------------------------------------------------------------{
+// Obtener coordenadas de OB
+get_coordinates(condition, top, btm, ob_val)=>
+    var ob_top  = array.new<float>()
+    var ob_btm  = array.new<float>()
+    var ob_avg  = array.new<float>()
+    var ob_left = array.new<int>()
+
+    float ob = na
+
+    // Añadir coordenadas a los arrays
+    if condition
+        avg = math.avg(top, btm)
+        ob_top.unshift(top)
+        ob_btm.unshift(btm)
+        ob_avg.unshift(avg)
+        ob_left.unshift(time[length])
+        ob := ob_val
+    
+    [ob_top, ob_btm, ob_avg, ob_left, ob]
+
+// Remover OBs mitigados desde los arrays de coordenadas
+remove_mitigated(ob_top, ob_btm, ob_left, ob_avg, target, bull)=>
+    mitigated = false
+    target_array = bull ? ob_btm : ob_top
+
+    int idx = na
+    for element in target_array
+        idx := target_array.indexof(element)
+        if (bull ? target < element : target > element)
+            mitigated := true
+            ob_top.remove(idx)
+            ob_btm.remove(idx)
+            ob_avg.remove(idx)
+            ob_left.remove(idx)
+            break
+    
+    mitigated
+
+// Pintar SOLO las líneas medias de los OBs en el gráfico
+set_order_block_lines(ob_avg, ob_left, ext_last, lvl_css)=>
+    var ob_lvl = array.new<line>()
+
+    // Inicializar arrays con líneas
+    if barstate.isfirst
+        for i = 0 to ext_last-1
+            ob_lvl.unshift(line.new(na, na, na, na,
+                 xloc = xloc.bar_time, extend = extend.right,
+                 color = lvl_css, style = line.style_solid, width = line_width))
+
+    // Actualizar/colocar líneas
+    if barstate.islast
+        if ob_avg.size() > 0
+            int limit = math.min(ext_last, ob_avg.size())
+            for i = 0 to limit - 1
+                line lvl = ob_lvl.get(i)
+                lvl.set_xy1(ob_left.get(i), ob_avg.get(i))
+                lvl.set_xy2(ob_left.get(i) + 1, ob_avg.get(i))
+//-----------------------------------------------------------------------------}
+// Elementos globales
+//-----------------------------------------------------------------------------{
+var os = 0
+var target_bull = 0.0
+var target_bear = 0.0
+
+upper = ta.highest(length)
+lower = ta.lowest(length)
+
+// Objetivo de mitigación por método
+if mitigation == 'Close'
+    target_bull := ta.lowest(close, length)
+    target_bear := ta.highest(close, length)
+else
+    target_bull := lower
+    target_bear := upper
+
+// Estado (sobre/infra)
+os := high[length] > upper ? 0 : low[length] < lower ? 1 : os[1]
+
+// Pivote de volumen - ahora devuelve booleano
+phv = ta.pivothigh(volume, length, length) != 0
+//-----------------------------------------------------------------------------}
+// Coordenadas de OBs alcistas/bajistas
+//-----------------------------------------------------------------------------{
+[bull_top, bull_btm, bull_avg, bull_left, bull_ob] = get_coordinates(phv and os == 1, hl2[length], low[length], low[length])
+
+[bear_top, bear_btm, bear_avg, bear_left, bear_ob] = get_coordinates(phv and os == 0, high[length], hl2[length], high[length])
+//-----------------------------------------------------------------------------}
+// Remover OBs mitigados
+//-----------------------------------------------------------------------------{
+mitigated_bull = remove_mitigated(bull_top, bull_btm, bull_left, bull_avg, target_bull, true)
+mitigated_bear = remove_mitigated(bear_top, bear_btm, bear_left, bear_avg, target_bear, false)
+//-----------------------------------------------------------------------------}
+// Mostrar SOLO las líneas medias de los OBs
+//-----------------------------------------------------------------------------{
+// Pintar líneas de OBs alcistas
+set_order_block_lines(bull_avg, bull_left, bull_ext_last, bull_avg_css)
+
+// Pintar líneas de OBs bajistas
+set_order_block_lines(bear_avg, bear_left, bear_ext_last, bear_avg_css)
+//-----------------------------------------------------------------------------}
