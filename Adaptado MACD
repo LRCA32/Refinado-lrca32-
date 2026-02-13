@@ -1,0 +1,108 @@
+/ This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32 v6.32
+
+//@version=6
+indicator("Adaptado MACD", overlay = false, max_labels_count = 500, max_lines_count = 500, precision = 4)
+
+//------------------------------------------------------------------------------
+// Configuraciones con interfaz de usuario mejorada
+//-----------------------------------------------------------------------------{
+int length = input.int(20, 'R2 ', minval = 2, group = "MACD Settings")
+int fast   = input.int(10, 'rapido', minval = 2, group = "MACD Settings")
+int slow   = input.int(20, 'lento', minval = 2, group = "MACD Settings")
+int signal = input.int(9, 'señal', minval = 2, group = "MACD Settings")
+
+// Opciones de visualización
+bool showHistogram = input.bool(true, "Histograma", group = "Display")
+bool showMACDLine  = input.bool(true, "Línea MACD", group = "Display")
+bool showSignal    = input.bool(true, "Línea de señal", group = "Display")
+bool showZeroLine  = input.bool(true, "Línea cero", group = "Display")
+
+// Personalización del color
+color bullColor   = input.color(color.rgb(60, 255, 0, 40), "Color alcista", group = "Colors")
+color bearColor   = input.color(color.rgb(255,0,60, 40), "Color bajista", group = "Colors")
+color macdColor   = input.color(color.rgb(217, 255, 0, 20), "Color de línea MACD", group = "Colors")
+color signalColor = input.color(color.rgb(0,60,255, 20), "Color de la línea de señal", group = "Colors")
+
+//-----------------------------------------------------------------------------}
+// Cálculo definitivo del MACD
+//-----------------------------------------------------------------------------{
+// Inicializar variables persistentes
+var float macd = 0.0
+
+// Calcular coeficientes
+float lag = (signal - 1) / 2.0
+float a1  = 2.0 / (fast + 1)
+float a2  = 2.0 / (slow + 1)
+
+// Calcular R² adaptativo
+float correlation = ta.correlation(close, bar_index, length)
+float r2 = 0.5 * math.pow(correlation, 2) + 0.5
+
+// Calcular el factor K adaptativo
+float K = r2 * ((1 - a1) * (1 - a2)) + (1 - r2) * ((1 - a1) / (1 - a2))
+
+// Actualización del MACD con suavizado adaptativo
+float closeDiff = close - close[1]
+float term1 = closeDiff * (a1 - a2)
+float term2 = (-a2 - a1 + 2) * nz(macd[1], 0.0)
+float term3 = K * nz(macd[2], 0.0)
+
+// Calcular el nuevo valor del MACD
+macd := term1 + term2 - term3
+
+// Calcular EMA y histograma
+float ema  = ta.ema(macd, signal)
+float hist = macd - ema
+
+// Tienda para comparar
+float prevHist = nz(hist[1], 0.0)
+float prevMacd = nz(macd[1], 0.0)
+
+//-----------------------------------------------------------------------------}
+// Cálculos de señal
+//-----------------------------------------------------------------------------{
+// señales cruzadas
+bool bullCross = ta.crossover(macd, ema)
+bool bearCross = ta.crossunder(macd, ema)
+bool zeroCross = ta.crossover(macd, 0) or ta.crossunder(macd, 0)
+
+// impulso del histograma
+bool histBullish = hist > 0 and hist > hist[1]
+bool histBearish = hist < 0 and hist < hist[1]
+bool histWeakBull = hist > 0 and hist < hist[1]
+bool histWeakBear = hist < 0 and hist > hist[1]
+
+// Fuerza de la tendencia
+float macdAbs = math.abs(macd)
+float emaAbs = math.abs(ema)
+float strength = emaAbs != 0 ? macdAbs / emaAbs * 100 : 0
+
+//-----------------------------------------------------------------------------}
+// Colores dinámicos
+//-----------------------------------------------------------------------------{
+color histColor = histBullish ? bullColor 
+     : histWeakBull ? color.new(bullColor, 70)
+     : histBearish ? bearColor
+     : color.new(bearColor, 70)
+
+color macdLineColor = macd > ema ? bullColor : bearColor
+color signalLineColor = ema > 0 ? color.new(bullColor, 30) : color.new(bearColor, 30)
+
+//-----------------------------------------------------------------------------}
+// Parcelas con estilo mejorado
+//-----------------------------------------------------------------------------{
+// histograma
+plot(showHistogram ? hist : na, "histograma", histColor, 2, 
+     plot.style_columns, display = display.all)
+
+// Línea MACD
+plot(showMACDLine ? macd : na, "Línea MACD", macdLineColor, 2, 
+     display = display.all)
+
+// Línea de señal
+plot(showSignal ? ema : na, "Línea de señal", signalColor, 2, 
+     display = display.all)
+
+// Línea cero: uso de la gráfica en lugar de la línea h para un mejor control
+plot(showZeroLine ? 0 : na, "Línea cero", color.gray, 1, plot.style_linebr)
