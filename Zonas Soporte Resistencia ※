@@ -1,0 +1,161 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32
+
+//@version=6
+indicator("Zonas Soporte Resistencia ※", overlay=true, max_lines_count=500)
+
+// ========================
+// Parámetros
+// ========================
+periodosOferta  = input.int(3, "Periodos Oferta", minval=1, maxval=50)
+periodosDemanda = input.int(3, "Periodos Demanda", minval=1, maxval=50)
+limiteLiquidadas = input.int(10, "Limite Liquidadas", minval=0, maxval=250)
+
+// ========================
+// Colores ROJO y AZUL neón
+// ========================
+colorOferta        = color.new(color.rgb(240, 45, 143), 50)      // Rojo neón para oferta rgb(240 45 143)
+colorOfertaLiq     = color.new(color.rgb(208, 78, 125), 80)    // Rojo más claro, liquidada rgb(208 78 125)
+colorDemanda       = color.new(color.rgb(45, 142, 240), 50)    // Azul neón para demanda rgb(45 142 240)
+colorDemandaLiq    = color.new(color.rgb(78, 126, 208), 80)   // Azul más claro, liquidada rgb(78 126 208)
+
+// ========================
+// Variables globales
+// ========================
+var array<line> lineasOfertaActivas = array.new_line()
+var array<line> lineasOfertaLiquidadas = array.new_line()
+var array<line> lineasDemandaActivas = array.new_line()
+var array<line> lineasDemandaLiquidadas = array.new_line()
+
+// ========================
+// Cálculos
+// ========================
+_maximoOferta = ta.highest(high, periodosOferta)
+_minimoDemanda = ta.lowest(low, periodosDemanda)
+
+// ========================
+// Oferta (ROJO) - Líneas horizontales
+// ========================
+velaDerechaOferta = open[3] < close[3]
+esOferta = velaDerechaOferta and (close[1] < close[2]) and (close[2] < close[3])
+
+// Crear nueva zona de oferta
+if esOferta and nz(ta.barssince(esOferta[1])) > 3
+    // Línea de techo (máximo) - Rojo neón
+    lineaTecho = line.new(bar_index[3], _maximoOferta, bar_index, _maximoOferta,
+                         color=colorOferta, width=2, style=line.style_solid,
+                         extend=extend.right, xloc=xloc.bar_index)
+    // Línea de suelo (low[3]) - Rojo neón                    
+    lineaSuelo = line.new(bar_index[3], low[3], bar_index, low[3],
+                         color=colorOferta, width=2, style=line.style_solid,
+                         extend=extend.right, xloc=xloc.bar_index)
+    
+    array.push(lineasOfertaActivas, lineaTecho)
+    array.push(lineasOfertaActivas, lineaSuelo)
+
+// Procesar ofertas activas
+if array.size(lineasOfertaActivas) > 0
+    for i = 0 to array.size(lineasOfertaActivas) - 1 by 2
+        if i + 1 <= array.size(lineasOfertaActivas) - 1
+            lineaTecho = array.get(lineasOfertaActivas, i)
+            lineaSuelo = array.get(lineasOfertaActivas, i + 1)
+            
+            precioTecho = line.get_price(lineaTecho, bar_index)
+            precioSuelo = line.get_price(lineaSuelo, bar_index)
+            
+            // Si el precio toca el suelo de la zona
+            if high >= precioSuelo
+                // Convertir a líneas punteadas (liquidadas) - Rojo más claro
+                leftBar = line.get_x1(lineaTecho)
+                
+                lineaTechoLiq = line.new(leftBar, precioTecho, bar_index, precioTecho,
+                                        color=colorOfertaLiq, width=1, style=line.style_dashed,
+                                        extend=extend.none, xloc=xloc.bar_index)
+                lineaSueloLiq = line.new(leftBar, precioSuelo, bar_index, precioSuelo,
+                                        color=colorOfertaLiq, width=2, style=line.style_dashed,
+                                        extend=extend.none, xloc=xloc.bar_index)
+                
+                array.push(lineasOfertaLiquidadas, lineaTechoLiq)
+                array.push(lineasOfertaLiquidadas, lineaSueloLiq)
+                
+                // Eliminar líneas activas
+                line.delete(lineaTecho)
+                line.delete(lineaSuelo)
+                array.remove(lineasOfertaActivas, i)
+                array.remove(lineasOfertaActivas, i)  // Mismo índice porque ya eliminamos el primero
+                break
+            else
+                // Extender líneas
+                line.set_x2(lineaTecho, bar_index)
+                line.set_x2(lineaSuelo, bar_index)
+
+// ========================
+// Demanda (AZUL) - Líneas horizontales
+// ========================
+velaDerechaDemanda = open[3] > close[3]
+esDemanda = velaDerechaDemanda and (close[1] > close[2]) and (close[2] > close[3])
+
+// Crear nueva zona de demanda
+if esDemanda and nz(ta.barssince(esDemanda[1])) > 3
+    // Línea de techo (high[3]) - Azul neón
+    lineaTecho = line.new(bar_index[3], high[3], bar_index, high[3],
+                         color=colorDemanda, width=2, style=line.style_solid,
+                         extend=extend.right, xloc=xloc.bar_index)
+    // Línea de suelo (mínimo) - Azul neón                    
+    lineaSuelo = line.new(bar_index[3], _minimoDemanda, bar_index, _minimoDemanda,
+                         color=colorDemanda, width=2, style=line.style_solid,
+                         extend=extend.right, xloc=xloc.bar_index)
+    
+    array.push(lineasDemandaActivas, lineaTecho)
+    array.push(lineasDemandaActivas, lineaSuelo)
+
+// Procesar demandas activas
+if array.size(lineasDemandaActivas) > 0
+    for i = 0 to array.size(lineasDemandaActivas) - 1 by 2
+        if i + 1 <= array.size(lineasDemandaActivas) - 1
+            lineaTecho = array.get(lineasDemandaActivas, i)
+            lineaSuelo = array.get(lineasDemandaActivas, i + 1)
+            
+            precioTecho = line.get_price(lineaTecho, bar_index)
+            precioSuelo = line.get_price(lineaSuelo, bar_index)
+            
+            // Si el precio toca el techo de la zona
+            if low <= precioTecho
+                // Convertir a líneas punteadas (liquidadas) - Azul más claro
+                leftBar = line.get_x1(lineaTecho)
+                
+                lineaTechoLiq = line.new(leftBar, precioTecho, bar_index, precioTecho,
+                                        color=colorDemandaLiq, width=1, style=line.style_dashed,
+                                        extend=extend.none, xloc=xloc.bar_index)
+                lineaSueloLiq = line.new(leftBar, precioSuelo, bar_index, precioSuelo,
+                                        color=colorDemandaLiq, width=2, style=line.style_dashed,
+                                        extend=extend.none, xloc=xloc.bar_index)
+                
+                array.push(lineasDemandaLiquidadas, lineaTechoLiq)
+                array.push(lineasDemandaLiquidadas, lineaSueloLiq)
+                
+                // Eliminar líneas activas
+                line.delete(lineaTecho)
+                line.delete(lineaSuelo)
+                array.remove(lineasDemandaActivas, i)
+                array.remove(lineasDemandaActivas, i)  // Mismo índice porque ya eliminamos el primero
+                break
+            else
+                // Extender líneas
+                line.set_x2(lineaTecho, bar_index)
+                line.set_x2(lineaSuelo, bar_index)
+
+// ========================
+// Limpieza de líneas liquidadas antiguas
+// ========================
+if array.size(lineasOfertaLiquidadas) > limiteLiquidadas * 2
+    for i = 0 to 1
+        if array.size(lineasOfertaLiquidadas) > 0
+            line.delete(array.get(lineasOfertaLiquidadas, 0))
+            array.remove(lineasOfertaLiquidadas, 0)
+
+if array.size(lineasDemandaLiquidadas) > limiteLiquidadas * 2
+    for i = 0 to 1
+        if array.size(lineasDemandaLiquidadas) > 0
+            line.delete(array.get(lineasDemandaLiquidadas, 0))
+            array.remove(lineasDemandaLiquidadas, 0)
