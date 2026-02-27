@@ -1,5 +1,5 @@
-/ This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
-// © lrca32 v6.32
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32 v6.37
 
 //@version=6
 indicator("Adaptado MACD", overlay = false, max_labels_count = 500, max_lines_count = 500, precision = 4)
@@ -10,7 +10,7 @@ indicator("Adaptado MACD", overlay = false, max_labels_count = 500, max_lines_co
 int length = input.int(20, 'R2 ', minval = 2, group = "MACD Settings")
 int fast   = input.int(10, 'rapido', minval = 2, group = "MACD Settings")
 int slow   = input.int(20, 'lento', minval = 2, group = "MACD Settings")
-int signal = input.int(9, 'señal', minval = 2, group = "MACD Settings")
+int signal = input.int(4, 'señal', minval = 2, group = "MACD Settings")
 
 // Opciones de visualización
 bool showHistogram = input.bool(true, "Histograma", group = "Display")
@@ -19,10 +19,11 @@ bool showSignal    = input.bool(true, "Línea de señal", group = "Display")
 bool showZeroLine  = input.bool(true, "Línea cero", group = "Display")
 
 // Personalización del color
-color bullColor   = input.color(color.rgb(60, 255, 0, 40), "Color alcista", group = "Colors")
-color bearColor   = input.color(color.rgb(255,0,60, 40), "Color bajista", group = "Colors")
-color macdColor   = input.color(color.rgb(217, 255, 0, 20), "Color de línea MACD", group = "Colors")
-color signalColor = input.color(color.rgb(0,60,255, 20), "Color de la línea de señal", group = "Colors")
+color bullColor   = input.color(color.rgb(32, 32, 32, 40), "alcista", group = "Colors")
+color bullColor2   = input.color(#3cff00, "alcista linea", group = "Colors")
+color bearColor   = input.color(color.rgb( 32, 32, 32, 40), "bajista", group = "Colors")
+color bearColor2   = input.color(#ff0000, "bajista linea", group = "Colors")
+color signalColor = input.color(#2962ff, "la línea de señal", group = "Colors")
 
 //-----------------------------------------------------------------------------}
 // Cálculo definitivo del MACD
@@ -86,7 +87,7 @@ color histColor = histBullish ? bullColor
      : histBearish ? bearColor
      : color.new(bearColor, 70)
 
-color macdLineColor = macd > ema ? bullColor : bearColor
+color macdLineColor = macd > ema ? bullColor2 : bearColor2
 color signalLineColor = ema > 0 ? color.new(bullColor, 30) : color.new(bearColor, 30)
 
 //-----------------------------------------------------------------------------}
