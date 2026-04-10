@@ -1,0 +1,96 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32
+
+//@version=5
+indicator("Tendencia con Rupturas", overlay = true)
+//------------------------------------------------------------------------------
+//Configuración
+//-----------------------------------------------------------------------------{
+length = input.int(14, 'Detección de Giros (Lookback)')
+mult = input.float(1., 'Pendiente', minval = 0, step = .1)
+calcMethod = input.string('Atr', 'Método de Cálculo de Pendiente', options = ['Atr','Stdev','Linreg'])
+backpaint = input(true, tooltip = 'Desplaza elementos mostrados hacia el pasado. Desactive para ver información en tiempo real devuelta por el indicador.')
+
+//Estilo
+upCss = input.color(color.rgb(0, 0, 0, 60), 'Color Línea Tendencia Alcista', group = 'Estilo')
+dnCss = input.color(color.rgb(0, 0, 0, 60), 'Color Línea Tendencia Bajista', group = 'Estilo')
+showExt = input(true, 'Mostrar Líneas Extendidas')
+
+//-----------------------------------------------------------------------------}
+//Cálculos
+//-----------------------------------------------------------------------------{
+var upper = 0.
+var lower = 0.
+var slope_ph = 0.
+var slope_pl = 0.
+
+var offset = backpaint ? length : 0
+
+n = bar_index
+src = close
+
+ph = ta.pivothigh(length, length)
+pl = ta.pivotlow(length, length)
+
+//Método de Cálculo de Pendiente
+slope = switch calcMethod
+    'Atr'    => ta.atr(length) / length * mult
+    'Stdev'  => ta.stdev(src,length) / length * mult
+    'Linreg' => math.abs(ta.sma(src * n, length) - ta.sma(src, length) * ta.sma(n, length)) / ta.variance(n, length) / 2 * mult
+
+//Obtiene pendientes y calcula líneas de tendencia
+slope_ph := ph ? slope : slope_ph
+slope_pl := pl ? slope : slope_pl
+
+upper := ph ? ph : upper - slope_ph
+lower := pl ? pl : lower + slope_pl
+
+var upos = 0
+var dnos = 0
+upos := ph ? 0 : close > upper - slope_ph * length ? 1 : upos
+dnos := pl ? 0 : close < lower + slope_pl * length ? 1 : dnos
+
+//-----------------------------------------------------------------------------}
+//Líneas Extendidas
+//-----------------------------------------------------------------------------{
+var uptl  = line.new(na,na,na,na, color = upCss, style = line.style_dashed, extend = extend.right)
+var dntl  = line.new(na,na,na,na, color = dnCss, style = line.style_dashed, extend = extend.right)
+
+if ph and showExt
+    uptl.set_xy1(n-offset, backpaint ? ph : upper - slope_ph * length)
+    uptl.set_xy2(n-offset+1, backpaint ? ph - slope : upper - slope_ph * (length+1))
+
+if pl and showExt
+    dntl.set_xy1(n-offset, backpaint ? pl : lower + slope_pl * length)
+    dntl.set_xy2(n-offset+1, backpaint ? pl + slope : lower + slope_pl * (length+1))
+
+//-----------------------------------------------------------------------------}
+//Trazados
+//-----------------------------------------------------------------------------{
+plot(backpaint ? upper : upper - slope_ph * length, 'Superior', color = ph ? na : upCss, offset = -offset)
+plot(backpaint ? lower : lower + slope_pl * length, 'Inferior', color = pl ? na : dnCss, offset = -offset)
+
+//Rupturas
+plotshape(upos > upos[1] ? low : na, "Ruptura Superior"
+  , shape.labelup
+  , location.absolute
+  , color.black
+  , text = "R"
+  , textcolor = color.white
+  , size = size.tiny)
+
+plotshape(dnos > dnos[1] ? high : na, "Ruptura Inferior"
+  , shape.labeldown
+  , location.absolute
+  , color.black
+  , text = "R"
+  , textcolor = color.white
+  , size = size.tiny)
+
+//-----------------------------------------------------------------------------}
+//Alertas
+//-----------------------------------------------------------------------------{
+alertcondition(upos > upos[1], 'Ruptura Alcista', 'El precio rompió la línea de tendencia bajista al alza')
+alertcondition(dnos > dnos[1], 'Ruptura Bajista', 'El precio rompió la línea de tendencia alcista a la baja')
+
+//-----------------------------------------------------------------------------}
