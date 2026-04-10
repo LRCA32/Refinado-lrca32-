@@ -1,0 +1,130 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32
+
+//@version=6
+indicator("Navegador de Toques de Línea de Tendencia", shorttitle="Toque Tendencia", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// --- Constantes ---
+const string G1 = "Largo Plazo"
+const string G2 = "Medio Plazo"
+const string G3 = "Corto Plazo"
+const string G_STYLE = "Estilo"
+
+// --- Entradas ---
+lengthL = input.int(60, "Longitud de Swings", minval=2, group=G1, tooltip="Barras izquierda y derecha usadas para encontrar pivotes para la línea de tendencia de largo plazo.")
+colorL  = input.color(#5b9cf6, "Color", group=G1)
+
+lengthM = input.int(30, "Longitud de Swings", minval=2, group=G2, tooltip="Barras izquierda y derecha usadas para encontrar pivotes para la línea de tendencia de medio plazo.")
+colorM  = input.color(#089981, "Color", group=G2)
+
+lengthS = input.int(10, "Longitud de Swings", minval=2, group=G3, tooltip="Barras izquierda y derecha usadas para encontrar pivotes para la línea de tendencia de corto plazo.")
+colorS  = input.color(#f23645, "Color", group=G3)
+
+showLabel = input.bool(true, "Mostrar Contador de Toques", group=G_STYLE, tooltip="Muestra el número de toques en la línea de tendencia.")
+
+// --- Tipos ---
+type Trendline
+    line  ln
+    label lb
+    float slope
+    int   startIdx
+    float startPrice
+    int   touches
+    bool  isBullish
+    bool  active
+    color col
+
+// --- Métodos ---
+method update(Trendline self, int n, float close) =>
+    if self.active
+        // Extender línea hasta la barra actual
+        float currentPrice = self.startPrice + self.slope * (n - self.startIdx)
+        self.ln.set_xy2(n, currentPrice)
+        
+        // Actualizar posición y texto de la etiqueta
+        if not na(self.lb)
+            self.lb.set_xy(n, currentPrice)
+            self.lb.set_text(str.tostring(self.touches) + " Toques")
+
+        // Verificar ruptura en el cierre
+        if (self.isBullish and close < currentPrice) or (not self.isBullish and close > currentPrice)
+            self.active := false
+            self.ln.set_color(color.new(self.col, 70))
+            if not na(self.lb)
+                self.lb.set_textcolor(color.new(self.col, 70))
+
+// --- Lógica ---
+processTrendline(int length, color col) =>
+    var Trendline bull = Trendline.new(line(na), label(na), 0.0, 0, 0.0, 0, true, false, col)
+    var Trendline bear = Trendline.new(line(na), label(na), 0.0, 0, 0.0, 0, false, false, col)
+    
+    int n = bar_index
+    
+    // Detección de pivotes
+    float ph = ta.pivothigh(length, length)
+    float pl = ta.pivotlow(length, length)
+    
+    // Línea de Tendencia Bajista (conectando máximos)
+    if not na(ph)
+        int phIdx = n - length
+        if not bear.active
+            // Iniciar nueva línea bajista
+            bear.active := true
+            bear.startIdx := phIdx
+            bear.startPrice := ph
+            bear.slope := 0.0
+            bear.touches := 1
+            bear.ln := line.new(phIdx, ph, n, ph, color=col, width=2)
+            if showLabel
+                bear.lb := label.new(n, ph, "1 Toque", color=#00000000, textcolor=col, style=label.style_label_left, size=size.small)
+        else
+            // Actualizar pendiente de línea bajista existente
+            float newSlope = (ph - bear.startPrice) / (phIdx - bear.startIdx)
+            // Verificar si el nuevo pivote es válido
+            bool isValid = true
+            for i = 0 to (n - bear.startIdx)
+                float linePrice = bear.startPrice + newSlope * (n - i - bear.startIdx)
+                if close[i] > linePrice
+                    isValid := false
+                    break
+            
+            if isValid and newSlope <= 0
+                bear.slope := newSlope
+                bear.touches += 1
+                
+    // Línea de Tendencia Alcista (conectando mínimos)
+    if not na(pl)
+        int plIdx = n - length
+        if not bull.active
+            // Iniciar nueva línea alcista
+            bull.active := true
+            bull.startIdx := plIdx
+            bull.startPrice := pl
+            bull.slope := 0.0
+            bull.touches := 1
+            bull.ln := line.new(plIdx, pl, n, pl, color=col, width=2)
+            if showLabel
+                bull.lb := label.new(n, pl, "1 Toque", color=#00000000, textcolor=col, style=label.style_label_left, size=size.small)
+        else
+            // Actualizar pendiente de línea alcista existente
+            float newSlope = (pl - bull.startPrice) / (plIdx - bull.startIdx)
+            // Verificar si el nuevo pivote es válido
+            bool isValid = true
+            for i = 0 to (n - bull.startIdx)
+                float linePrice = bull.startPrice + newSlope * (n - i - bull.startIdx)
+                if close[i] < linePrice
+                    isValid := false
+                    break
+            
+            if isValid and newSlope >= 0
+                bull.slope := newSlope
+                bull.touches += 1
+
+    // Actualizar líneas activas
+    bull.update(n, close)
+    bear.update(n, close)
+
+// --- Ejecución ---
+processTrendline(lengthL, colorL)
+processTrendline(lengthM, colorM)
+processTrendline(lengthS, colorS)
