@@ -1,0 +1,90 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32 v6.47 - BTCUSD Edition
+
+//@version=6
+indicator(title="BTCUSD Oscillator", explicit_plot_zorder = true)
+
+//───────────────────────
+// CONFIGURACIÓN BTCUSD
+//───────────────────────
+conversionPeriods   = input.int(9,  minval=1, title="Tenkan-sen (Conversión)", group="⚙️ Configuración 5Min")
+basePeriods         = input.int(26,  minval=1, title="Kijun-sen (Base)", group="⚙️ Configuración 5Min")
+laggingSpan2Periods = input.int(52,  minval=1, title="Senkou Span B", group="⚙️ Configuración 5Min")
+displacement        = input.int(26,  minval=1, title="Desplazamiento", group="⚙️ Configuración 5Min")
+
+//───────────────────────
+// VWMA (Filtro adicional)
+//───────────────────────
+useema = input.bool(true, title="Mostrar", group="📊 Filtro VWMA")
+emalen = input.int(18, title="  Longitud", minval=1, group="📊 Filtro VWMA")
+emacol = input.color(#ffaa00, title="  Color", group="📊 Filtro VWMA")
+emawd  = input.int(2, title="  Grosor", minval=1, maxval=5, group="📊 Filtro VWMA")
+
+//───────────────────────
+// COLORES 
+//───────────────────────
+upcol1 = input.color(color.rgb(0, 255, 255, 70), title="🔺 Área Alcista", inline="up", group="🎨 Colores")
+upcol2 = input.color(color.rgb(0, 255, 200, 60), title="🔺 Columnas Alcistas", inline="up", group="🎨 Colores")
+upcol3 = input.color(color.rgb(0, 180, 255, 70), title="🔺 Histograma Alcista", inline="up", group="🎨 Colores")
+upcol4 = input.color(#00ffff, title="🔺 Línea Principal Alcista", inline="up", group="🎨 Colores")
+
+dbcol1 = input.color(#ff00ff4d, title="🔻 Área Bajista", inline="dn", group="🎨 Colores")
+dbcol2 = input.color(color.rgb(255, 0, 200, 60), title="🔻 Columnas Bajistas", inline="dn", group="🎨 Colores")
+dbcol3 = input.color(color.rgb(200, 0, 255, 70), title="🔻 Histograma Bajista", inline="dn", group="🎨 Colores")
+dbcol4 = input.color(#7b68ee, title="🔻 Línea Principal Bajista", inline="dn", group="🎨 Colores")
+
+inSRcolor = color.new(color.white, 100)
+
+//───────────────────────
+// CÁLCULO ICHIMOKU
+//───────────────────────
+donchian(len) => math.avg(ta.lowest(len), ta.highest(len))
+
+conversionLine = donchian(conversionPeriods)
+baseLine       = donchian(basePeriods)
+leadLine1      = math.avg(conversionLine, baseLine)
+leadLine2      = donchian(laggingSpan2Periods)
+
+//───────────────────────
+// OSCILADOR
+//───────────────────────
+var int mtrend = 0
+
+CloudMin = math.min(leadLine1[displacement - 1], leadLine2[displacement - 1])
+CloudMax = math.max(leadLine1[displacement - 1], leadLine2[displacement - 1])
+
+mtrend := close > CloudMax ? 1 : close < CloudMin ? -1 : mtrend
+
+Oscline = mtrend == 1 ? close - CloudMin : close - CloudMax
+Osccolor = close > CloudMax ? upcol1 : close < CloudMin ? dbcol1 : color.new(color.white, 100)
+
+Lagging = Oscline + (mtrend == 1 ?
+           math.max(close - CloudMax[displacement - 1], 0) :
+           math.min(close - CloudMin[displacement - 1], 0))
+
+ConvBase = Lagging + (mtrend == 1 ?
+           math.max(conversionLine - baseLine, 0) :
+           math.min(conversionLine - baseLine, 0))
+
+ConvBaseColor = conversionLine >= baseLine ? upcol3 : dbcol3
+
+cloud = ConvBase + (mtrend == 1 ? math.max(leadLine1 - leadLine2, 0) : math.min(leadLine1 - leadLine2, 0))
+
+//───────────────────────
+// GRÁFICOS
+//───────────────────────
+plot(cloud,    color=mtrend==1?upcol4:dbcol4, style=plot.style_line, linewidth=2)
+plot(ConvBase, color=ConvBaseColor, style=plot.style_histogram)
+plot(Lagging,  color=mtrend==1?upcol2:dbcol2, style=plot.style_columns)
+plot(Oscline,  color=Osccolor, style=plot.style_areabr)
+
+emaline = ta.vwma(cloud, emalen)
+plot(emaline, linewidth=emawd, color=useema?emacol:na)
+
+hline(0, color=color.rgb(100, 200, 255, 40), linewidth=1, linestyle=hline.style_dotted)
+
+//───────────────────────
+// ALERTAS
+//───────────────────────
+alertcondition(ta.crossover(cloud, 0), title="🔺 CRUCE ALCISTA BTCUSD", message="BTCUSD: Señal COMPRA")
+alertcondition(ta.crossunder(cloud, 0), title="🔻 CRUCE BAJISTA BTCUSD", message="BTCUSD: Señal VENTA")
