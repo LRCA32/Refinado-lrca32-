@@ -1,0 +1,284 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32
+
+//@version=6
+indicator("Cono de Probabilidad Adaptativo", overlay = true, max_lines_count = 500, max_labels_count = 500, max_boxes_count = 500)
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 CONFIGURACIÓN PRINCIPAL - MODO DE CONJETURA
+// --------------------------------------------------------------------------------------------------------------------}
+
+modoConjetura = input.string("Neutral", "🔮 Modo de Conjetura", options = ["Optimista", "Pesimista", "Neutral", "Volátil", "Estable"], group = "🎯 MODO DE CONJETURA", tooltip = "Selecciona la tendencia proyectada del cono")
+
+// Ajustar sigma según la conjetura
+sigmaAjuste = switch modoConjetura
+    "Optimista" => 0.7   // Más estrecho, proyección alcista
+    "Pesimista" => 1.3   // Más ancho, proyección bajista
+    "Neutral"   => 1.0   // Normal
+    "Volátil"   => 1.5   // Muy ancho, alta incertidumbre
+    "Estable"   => 0.5   // Muy estrecho, baja volatilidad
+    => 1.0
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 PARÁMETROS FIJOS
+// --------------------------------------------------------------------------------------------------------------------{
+
+volLongitud = input.int(20, "Longitud Volatilidad", minval = 5, maxval = 50, group = "⚙️ PARÁMETROS")
+velasPorAno = input.int(365, "Velas por Año", minval = 252, maxval = 365, group = "⚙️ PARÁMETROS")
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 CONFIGURACIÓN PRINCIPAL DE SIGMAS
+// --------------------------------------------------------------------------------------------------------------------{
+
+// Nivel Sigma 1
+mostrar1Sigma      = input.bool(true,   "Mostrar Sigma 1", group = "⚡ SIGMAS", inline = "s1")
+sigma1ValorBase    = input.float(1.0,   "σ1 Base", minval = 0.05, maxval = 7.0, step = 0.01, group = "⚡ SIGMAS", inline = "s1")
+periodo1Sigma      = input.int(50,      "Período σ1", minval = 10, maxval = 200, step = 5, group = "⚡ SIGMAS", inline = "s1")
+
+// Nivel Sigma 2
+mostrar2Sigma      = input.bool(true,   "Mostrar Sigma 2", group = "⚡ SIGMAS", inline = "s2")
+sigma2ValorBase    = input.float(2.0,   "σ2 Base", minval = 0.05, maxval = 7.0, step = 0.01, group = "⚡ SIGMAS", inline = "s2")
+periodo2Sigma      = input.int(60,      "Período σ2", minval = 10, maxval = 200, step = 5, group = "⚡ SIGMAS", inline = "s2")
+
+// Nivel Sigma 3
+mostrar3Sigma      = input.bool(true,   "Mostrar Sigma 3", group = "⚡ SIGMAS", inline = "s3")
+sigma3ValorBase    = input.float(3.0,   "σ3 Base", minval = 0.05, maxval = 7.0, step = 0.01, group = "⚡ SIGMAS", inline = "s3")
+periodo3Sigma      = input.int(70,      "Período σ3", minval = 10, maxval = 200, step = 5, group = "⚡ SIGMAS", inline = "s3")
+
+// Aplicar ajuste de conjetura a los sigma
+sigma1Valor = sigma1ValorBase * sigmaAjuste
+sigma2Valor = sigma2ValorBase * sigmaAjuste
+sigma3Valor = sigma3ValorBase * sigmaAjuste
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 ANCLAJE DEL CONO
+// --------------------------------------------------------------------------------------------------------------------{
+
+modoAnclaje   = input.bool(true,  "Anclar Cono a Pivote", group = "📍 ANCLAJE", tooltip = "Cuando está activado, el cono se ancla al pivote más reciente en lugar de la vela actual.")
+
+// 🧲 Modo Magnético con sensibilidad ajustable
+modoMagnetico = input.string("Fuerte", "🧲 Modo Magnético", options = ["Débil", "Fuerte"], group = "📍 ANCLAJE", tooltip = "Débil = detecta pivotes pequeños. Fuerte = solo pivotes grandes.")
+
+// 📊 Sensibilidad del modo Débil (valor de pivote)
+sensibilidadDebil = input.int(3, "🔧 Sensibilidad Débil", minval = 2, maxval = 7, group = "📍 ANCLAJE", tooltip = "Valor bajo (2) = más sensible. Valor alto (5-7) = menos sensible")
+
+// Calcular longitud de pivote según el modo magnético
+longPivote = modoMagnetico == "Débil" ? sensibilidadDebil : 10
+
+anclarToro    = input.bool(true, "Anclar a Mínimo (Toro)", group = "📍 ANCLAJE", tooltip = "True = anclar a mínimos. False = anclar a máximos.")
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 CONFIGURACIÓN VISUAL - COLORES
+// --------------------------------------------------------------------------------------------------------------------{
+
+// Colores Sigma 1
+color1SigmaSupInicio = input.color(color.new(#ff6b6b, 20), "σ1 Superior Inicio", group = "🎨 COLORES σ1")
+color1SigmaSupFin    = input.color(color.new(#ff0000, 20), "σ1 Superior Final",  group = "🎨 COLORES σ1")
+color1SigmaInfInicio = input.color(color.new(#51cf66, 20), "σ1 Inferior Inicio", group = "🎨 COLORES σ1")
+color1SigmaInfFin    = input.color(color.new(#2b8c3e, 20), "σ1 Inferior Final",  group = "🎨 COLORES σ1")
+
+// Colores Sigma 2
+color2SigmaSupInicio = input.color(color.new(#ffa500, 20), "σ2 Superior Inicio", group = "🎨 COLORES σ2")
+color2SigmaSupFin    = input.color(color.new(#ff6600, 20), "σ2 Superior Final",  group = "🎨 COLORES σ2")
+color2SigmaInfInicio = input.color(color.new(#69db7e, 20), "σ2 Inferior Inicio", group = "🎨 COLORES σ2")
+color2SigmaInfFin    = input.color(color.new(#3b9e4d, 20), "σ2 Inferior Final",  group = "🎨 COLORES σ2")
+
+// Colores Sigma 3
+color3SigmaSupInicio = input.color(color.new(#ffc107, 20), "σ3 Superior Inicio", group = "🎨 COLORES σ3")
+color3SigmaSupFin    = input.color(color.new(#ff8c00, 20), "σ3 Superior Final",  group = "🎨 COLORES σ3")
+color3SigmaInfInicio = input.color(color.new(#8ce99a, 20), "σ3 Inferior Inicio", group = "🎨 COLORES σ3")
+color3SigmaInfFin    = input.color(color.new(#4cae5c, 20), "σ3 Inferior Final",  group = "🎨 COLORES σ3")
+
+// Configuración global
+anchoLinea      = input.int(1, "Ancho de Línea", minval = 1, maxval = 4, group = "👁️ VISUAL")
+colorAnclaje    = input.color(color.new(#ffffff, 0), "Color Línea Anclaje", group = "👁️ VISUAL")
+mostrarEtiquetas = input.bool(true, "Mostrar HH/HL/LH/LL", group = "👁️ VISUAL", tooltip = "Muestra etiquetas en los pivotes detectados")
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 MARCA DE AGUA (WATERMARK)
+// --------------------------------------------------------------------------------------------------------------------{
+
+showWatermark = input.bool(true, "Mostrar Marca de Agua", group = "💧 MARCA DE AGUA", tooltip = "Muestra 'ircapro' en el gráfico")
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 CÁLCULOS DEL INDICADOR
+// --------------------------------------------------------------------------------------------------------------------{
+
+retornoLog = math.log(close / close[1])
+volRaw     = ta.stdev(retornoLog, volLongitud)
+volAnual   = volRaw * math.sqrt(velasPorAno)
+
+pivAlto = ta.pivothigh(high, longPivote, longPivote)
+pivBajo = ta.pivotlow(low,  longPivote, longPivote)
+
+var float precioAnclado     = na
+var int   indiceBarraAnclada = na
+var float volAnclada         = na
+
+if modoAnclaje
+    if anclarToro
+        if not na(pivBajo)
+            precioAnclado     := low[longPivote]
+            indiceBarraAnclada := bar_index - longPivote
+            volAnclada         := volAnual[longPivote]
+    else
+        if not na(pivAlto)
+            precioAnclado     := high[longPivote]
+            indiceBarraAnclada := bar_index - longPivote
+            volAnclada         := volAnual[longPivote]
+
+float precioAncla  = modoAnclaje and not na(precioAnclado)     ? precioAnclado    : close
+int   indiceAncla = modoAnclaje and not na(indiceBarraAnclada) ? indiceBarraAnclada : bar_index
+float volAncla    = modoAnclaje and not na(volAnclada)         ? volAnclada       : volAnual
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 ARRAYS Y OBJETOS PERSISTENTES
+// --------------------------------------------------------------------------------------------------------------------{
+
+var line[] lineas1Sup = array.new<line>()
+var line[] lineas1Inf = array.new<line>()
+var line[] lineas2Sup = array.new<line>()
+var line[] lineas2Inf = array.new<line>()
+var line[] lineas3Sup = array.new<line>()
+var line[] lineas3Inf = array.new<line>()
+var label[] etiquetasPivote = array.new<label>()
+var table wmTable = na
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 FUNCIONES AUXILIARES
+// --------------------------------------------------------------------------------------------------------------------{
+
+borrarLineas(line[] arr) =>
+    if arr.size() > 0
+        for i = 0 to arr.size() - 1
+            line.delete(arr.get(i))
+    arr.clear()
+
+borrarEtiquetas(label[] arr) =>
+    if arr.size() > 0
+        for i = 0 to arr.size() - 1
+            label.delete(arr.get(i))
+    arr.clear()
+
+precioCono(float precioBase, float vol, int t, float multiplicadorSigma, int direccion) =>
+    deriva = direccion * multiplicadorSigma * vol * math.sqrt(float(t) / float(velasPorAno))
+    precioBase * math.exp(deriva)
+
+colorGradiente(int t, int totalVelas, color colorInicio, color colorFin) =>
+    float progreso = float(t - 1) / float(totalVelas - 1)
+    color.rgb(
+        color.r(colorInicio) + (color.r(colorFin) - color.r(colorInicio)) * progreso,
+        color.g(colorInicio) + (color.g(colorFin) - color.g(colorInicio)) * progreso,
+        color.b(colorInicio) + (color.b(colorFin) - color.b(colorInicio)) * progreso
+    )
+
+dibujarNivelSigma(float mult, int periodo, bool mostrar, 
+                  color cSupInicio, color cSupFin, 
+                  color cInfInicio, color cInfFin,
+                  line[] arrSup, line[] arrInf) =>
+    if mostrar and periodo > 0
+        for t = 1 to periodo
+            x1 = indiceAncla + t - 1
+            x2 = indiceAncla + t
+            
+            colorSup = colorGradiente(t, periodo, cSupInicio, cSupFin)
+            colorInf = colorGradiente(t, periodo, cInfInicio, cInfFin)
+            
+            p1_sup = precioCono(precioAncla, volAncla, math.max(t - 1, 1), mult,  1)
+            p1_inf = precioCono(precioAncla, volAncla, math.max(t - 1, 1), mult, -1)
+            p2_sup = precioCono(precioAncla, volAncla, t, mult,  1)
+            p2_inf = precioCono(precioAncla, volAncla, t, mult, -1)
+            
+            arrSup.push(line.new(x1, p1_sup, x2, p2_sup, color = colorSup, width = anchoLinea, style = line.style_solid))
+            arrInf.push(line.new(x1, p1_inf, x2, p2_inf, color = colorInf, width = anchoLinea, style = line.style_solid))
+
+dibujarEtiquetasPivote() =>
+    hh = ta.pivothigh(high, longPivote, longPivote)
+    if not na(hh) and mostrarEtiquetas
+        label nueva = label.new(bar_index - longPivote, hh, "HH", 
+                               color = color.new(#00ff00, 80), 
+                               textcolor = color.new(#00ff00, 0), 
+                               style = label.style_label_down, 
+                               size = size.small)
+        etiquetasPivote.push(nueva)
+    
+    hl = ta.pivotlow(low, longPivote, longPivote)
+    if not na(hl) and mostrarEtiquetas
+        label nueva = label.new(bar_index - longPivote, hl, "HL",
+                               color = color.new(#ffff00, 80),
+                               textcolor = color.new(#ffff00, 0),
+                               style = label.style_label_up,
+                               size = size.small)
+        etiquetasPivote.push(nueva)
+    
+    lh = ta.pivothigh(high, longPivote, longPivote)
+    if not na(lh) and mostrarEtiquetas
+        label nueva = label.new(bar_index - longPivote, lh, "LH",
+                               color = color.new(#ff8800, 80),
+                               textcolor = color.new(#ff8800, 0),
+                               style = label.style_label_down,
+                               size = size.small)
+        etiquetasPivote.push(nueva)
+    
+    if not na(pivBajo) and mostrarEtiquetas
+        label nueva = label.new(bar_index - longPivote, pivBajo, "LL",
+                               color = color.new(#ff0000, 80),
+                               textcolor = color.new(#ff0000, 0),
+                               style = label.style_label_up,
+                               size = size.small)
+        etiquetasPivote.push(nueva)
+
+// --------------------------------------------------------------------------------------------------------------------}
+// 📌 VISUALIZACIÓN
+// --------------------------------------------------------------------------------------------------------------------{
+
+if barstate.islast
+    borrarLineas(lineas1Sup)
+    borrarLineas(lineas1Inf)
+    borrarLineas(lineas2Sup)
+    borrarLineas(lineas2Inf)
+    borrarLineas(lineas3Sup)
+    borrarLineas(lineas3Inf)
+    borrarEtiquetas(etiquetasPivote)
+    
+    dibujarNivelSigma(sigma1Valor, periodo1Sigma, mostrar1Sigma, 
+                      color1SigmaSupInicio, color1SigmaSupFin,
+                      color1SigmaInfInicio, color1SigmaInfFin,
+                      lineas1Sup, lineas1Inf)
+                  
+    dibujarNivelSigma(sigma2Valor, periodo2Sigma, mostrar2Sigma,
+                      color2SigmaSupInicio, color2SigmaSupFin,
+                      color2SigmaInfInicio, color2SigmaInfFin,
+                      lineas2Sup, lineas2Inf)
+                  
+    dibujarNivelSigma(sigma3Valor, periodo3Sigma, mostrar3Sigma,
+                      color3SigmaSupInicio, color3SigmaSupFin,
+                      color3SigmaInfInicio, color3SigmaInfFin,
+                      lineas3Sup, lineas3Inf)
+    
+    dibujarEtiquetasPivote()
+    
+    var line lineaAnclaje = na
+    line.delete(lineaAnclaje)
+    lineaAnclaje := line.new(indiceAncla, precioAncla * 0.9, indiceAncla, precioAncla * 1.1, 
+                    color = colorAnclaje, width = 2, style = line.style_dotted, extend = extend.both)
+    
+    // Mostrar título de conjetura en el gráfico
+    var label tituloConjetura = na
+    label.delete(tituloConjetura)
+    tituloConjetura := label.new(bar_index - 5, precioAncla * 1.15, "🔮 " + modoConjetura, 
+                       color = color.new(colorAnclaje, 90),
+                       textcolor = colorAnclaje,
+                       style = label.style_label_lower_left,
+                       size = size.small)
+    
+    // 💧 MARCA DE AGUA (WATERMARK)
+    if showWatermark
+        var table wmTable = na
+        if na(wmTable)
+            wmTable := table.new(position.top_right, 1, 1, bgcolor = color.new(#242423, 100))
+        table.cell(wmTable, 0, 0, "ircapro", 
+                   text_color = color.rgb(83, 81, 65), 
+                   text_size = size.normal, 
+                   text_halign = text.align_center, 
+                   bgcolor = color.new(#242423, 100))
