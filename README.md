@@ -1,6 +1,6 @@
-# Refinado-lrca32 🚀
+# Refinado-irca pro 🚀
 
-¡Hola! Soy LRCA32 y este es mi pequeño juguete para TradingView: un "indicador de oferta y demanda" que hace gran parte del trabajo duro por ti.  
+¡Hola! Soy irca pro y este es mi pequeño juguete para TradingView: un "indicador de oferta y demanda" que hace gran parte del trabajo duro por ti.  
 
 Sí, aún no soy un pro, pero este indicador ya me salva la vida (o al menos mi gráfico 😅).
 
