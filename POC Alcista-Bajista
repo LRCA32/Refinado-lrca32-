@@ -4,13 +4,16 @@
 //@version=6
 indicator("POC - Alcista/Bajista", overlay=true)
 
-lookback = input.int(300, "Período de Retroceso")
+//@version=6
+indicator("POC Simple", overlay=true)
+
+lookback = input.int(300, "Retroceso")
 rows = input.int(50, "Filas")
 
 // Controles de transparencia
-transparencia = input.int(70, "Transparencia %", minval=0, maxval=90)
+transparencia = input.int(70, "Transparencia %", minval=0, maxval=90, tooltip="0 = sólido, 90 = casi invisible")
 
-// Colores
+// Colores con transparencia ajustable
 colorVerde = input.color(color.new(color.green, 0), "Color POC Alcista")
 colorRojo = input.color(color.new(color.red, 0), "Color POC Bajista")
 
@@ -30,7 +33,7 @@ if barstate.islast
     var float[] lows = array.new<float>()
     var float[] volumes = array.new<float>()
     
-    // Llenar arrays con los datos históricos
+    // Llenar arrays
     for i = 0 to lookback - 1
         array.push(highs, high[i])
         array.push(lows, low[i])
@@ -66,33 +69,25 @@ if barstate.islast
     array.clear(lows)
     array.clear(volumes)
     
-    // ========== LÓGICA ALCISTA/BAJISTA ==========
-    // Si el POC está por DEBAJO del precio actual = SOPORTE = ALCISTA (VERDE)
-    // Si el POC está por ENCIMA del precio actual = RESISTENCIA = BAJISTA (ROJO)
-    
-    bool esAlcista = pocPrice < close   // POC debajo del precio = soporte
-    bool esBajista = pocPrice > close   // POC arriba del precio = resistencia
-    
     // Aplicar transparencia a los colores
-    color colorFinal = na
+    color colorFinalAlcista = color.new(colorVerde, transparencia)
+    color colorFinalBajista = color.new(colorRojo, transparencia)
     
-    if esAlcista
-        colorFinal := color.new(colorVerde, transparencia)
-    else if esBajista
-        colorFinal := color.new(colorRojo, transparencia)
+    // Determinar color según el precio actual vs POC
+    color colorPOC = pocPrice < close ? colorFinalAlcista : colorFinalBajista
     
     // Borrar línea anterior
     if not na(pocLine)
         line.delete(pocLine)
     
-    // Dibujar POC
-    if not na(pocPrice) and not na(colorFinal)
+    // Dibujar POC con transparencia
+    if not na(pocPrice)
         pocLine := line.new(
              x1 = bar_index - lookback,
              y1 = pocPrice,
-             x2 = bar_index,
+             x2 = bar_index + 20,
              y2 = pocPrice,
-             color = colorFinal,
+             color = colorPOC,
              width = 3,
-             extend = extend.none
+             extend = extend.right
          )
