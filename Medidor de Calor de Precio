@@ -1,0 +1,130 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © irca-pro
+
+//@version=6
+indicator("Medidor de Calor de Precio", overlay = true)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 📌 CONFIGURACIÓN
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+int   length = input.int(50, "Longitud del Período")
+color cold   = input.color(color.aqua, "Color Frío")
+color mid    = input.color(color.yellow, "Color Medio")
+color hot    = input.color(color.red, "Color Caliente")
+color tableBg = input.color(color.new(color.gray, 90), "Fondo de Tabla")
+
+// Posición de la tabla
+string verticalPosition = input.string("bottom", "Posición Vertical", options = ["top", "middle", "bottom"])
+string horizontalPosition = input.string("left", "Posición Horizontal", options = ["left", "center", "right"])
+
+// Elementos a mostrar
+bool showArrows   = input.bool(true, "Mostrar Flechas (▼/▲)")
+bool showGradient = input.bool(true, "Mostrar Barra de Gradiente")
+bool showMarker   = input.bool(true, "Mostrar Marcador (●)")
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 📌 CÁLCULOS
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+float highestHigh = ta.highest(high, length)
+float lowestLow   = ta.lowest(low, length)
+float normValue   = (close - lowestLow) / (highestHigh - lowestLow)
+float heatPercent = normValue * 100
+
+// Seguimiento de extremos
+var int   countUp = 0
+var float upper   = 0.
+var int   countDn = 0
+var float lower   = 0.
+
+if highestHigh == high
+    upper := highestHigh
+
+if upper != upper[1]
+    countUp := 0
+else if upper == upper[1]
+    countUp += 1
+
+if lowestLow == low
+    lower := lowestLow
+
+if lower != lower[1]
+    countDn := 0
+else if lower == lower[1]
+    countDn += 1
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 📌 COLORES
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+color heatColor = heatPercent < 50 ? 
+                  color.from_gradient(heatPercent, 0, 50, cold, mid) : 
+                  color.from_gradient(heatPercent, 50, 100, mid, hot)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 📌 VISUALIZACIÓN
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+// Velas coloreadas
+plotcandle(open, high, low, close, color=heatColor, wickcolor=heatColor, bordercolor=heatColor)
+barcolor(heatColor)
+
+// Líneas de extremos
+plot(upper != upper[1] ? na : upper, color=color.from_gradient(countUp, 0, 100, hot, color.new(color.black, 100)), style=plot.style_linebr)
+plot(lower != lower[1] ? na : lower, color=color.from_gradient(countDn, 0, 100, cold, color.new(color.black, 100)), style=plot.style_linebr)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+// 📌 TABLA
+// ═══════════════════════════════════════════════════════════════════════════════════════════════════════════════════
+
+getTablePosition() =>
+    string posKey = verticalPosition + "_" + horizontalPosition
+    switch posKey
+        "top_left"     => position.top_left
+        "top_center"   => position.top_center
+        "top_right"    => position.top_right
+        "middle_left"  => position.middle_left
+        "middle_center"=> position.middle_center
+        "middle_right" => position.middle_right
+        "bottom_left"  => position.bottom_left
+        "bottom_center"=> position.bottom_center
+        "bottom_right" => position.bottom_right
+        => position.bottom_left
+
+if barstate.islast
+    int currentPos = math.round(normValue * 50)
+    int totalRows = 0
+    if showArrows
+        totalRows += 1
+    if showGradient
+        totalRows += 1
+    if showMarker
+        totalRows += 1
+    
+    if totalRows == 0
+        runtime.error("Debe mostrar al menos un elemento")
+    
+    var table heatTable = table.new(getTablePosition(), 51, totalRows, bgcolor = tableBg)
+    int row = 0
+    
+    // Flechas
+    if showArrows
+        for i = 0 to 50
+            color cellColor = i < 25 ? color.from_gradient(i, 0, 25, cold, mid) : color.from_gradient(i, 25, 50, mid, hot)
+            color arrowColor = i == 0 ? cold : i == 50 ? hot : color.white
+            heatTable.cell(i, row, i == 0 ? "▼" : i == 50 ? "▲" : "", text_color=arrowColor, bgcolor=color.new(cellColor, 70), text_size=size.small, width=1)
+        row += 1
+    
+    // Gradiente
+    if showGradient
+        for i = 0 to 50
+            color cellColor = i < 25 ? color.from_gradient(i, 0, 25, cold, mid) : color.from_gradient(i, 25, 50, mid, hot)
+            heatTable.cell(i, row, "", bgcolor=cellColor, width=1)
+        row += 1
+    
+    // Marcador
+    if showMarker
+        for i = 0 to 50
+            bool isCurrent = (i == currentPos)
+            heatTable.cell(i, row, isCurrent ? "●" : "", text_color=color.white, bgcolor=isCurrent ? heatColor : color.new(color.white, 100), text_size=size.small, width=1)
