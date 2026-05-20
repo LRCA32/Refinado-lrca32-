@@ -1,0 +1,272 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © irca-pro
+
+//@version=6
+indicator("Perfil de Flujo de Dinero - Calor", overlay = true, max_boxes_count = 500)
+
+bbars               = input.int(title='Número de Barras', defval = 500, minval = 1, maxval = 500)
+cnum                = input.int(title='Tamaño de Fila', defval = 200, minval = 5, maxval = 500)
+profile_src         = input.string("Volumen", "Fuente", options = ["Volumen", "Flujo de Dinero"])
+
+// 🎨 COLORES CALOR
+color coldColor     = input.color(#00BCD4, "Color Frío (Cyan)")
+color midColor      = input.color(#FDD835, "Color Medio (Amarillo)")
+color hotColor      = input.color(#F23645, "Color Caliente (Rojo)")
+
+show_sentiments     = input.bool(true, "Oferta/Demanda por Análisis de Sentimiento")
+show_profile        = input.bool(true, "Mostrar Perfil de Volumen")
+show_text           = input.bool(true, "Mostrar Información")
+
+// Controles de transparencia del texto
+int textTransparency = input.int(10, "Transparencia del Texto (0-100)", minval=0, maxval=100)
+
+top                 = ta.highest(bbars)
+bot                 = ta.lowest(bbars)
+dist                = (top - bot) / 500
+step                = (top - bot) / cnum
+
+
+var vol_arr         = array.new_float(cnum + 1)
+var bull_vol_arr    = array.new_float(cnum + 1)
+var bear_vol_arr    = array.new_float(cnum + 1)
+
+float max_delta_vol = na
+float sum_delta_vol = 0
+
+//inicializando los niveles
+var levels          = array.new_float(cnum + 1)
+if last_bar_index - bar_index == 1
+    for x = 0 to cnum by 1
+        array.set(levels, x, bot + step * x)
+        array.set(vol_arr, x, 0)
+        array.set(bull_vol_arr, x, 0)
+        array.set(bear_vol_arr, x, 0)
+
+var box_arr = array.new_box(0)
+var _box    = array.new_box(0)
+
+f_initBoxes(box) => 
+    array_size = array.size(box)
+    for int v = array_size > 0 ? 0 : na to array_size - 1
+        box.delete(array.get(box, v))
+    array.clear(box)
+
+f_preWidth(_max) =>
+    array.get(bull_vol_arr, _max) / (array.get(bull_vol_arr ,_max) + array.get(bear_vol_arr, _max))
+
+if barstate.islast
+    for n = 0 to bbars
+        for x = 0 to cnum by 1
+            box_bot = bot + step * x
+            box_top = bot + (step * (x + 1))
+            box_diff = (box_top - box_bot)
+
+            //proporción del volumen a asignar a cada perfil
+            vR =  (high[n] >= box_top and low[n] <= box_bot) ?
+             box_diff / (high[n] - low[n])  : 
+
+             low[n] > box_bot and low[n] < box_top ?
+             (box_top - low[n]) /  (high[n] - low[n]) :
+
+             (high[n] > box_bot and high[n] < box_top) ?
+             (high[n] - box_bot) /  (high[n] - low[n]) :
+
+             0.00
+
+            if high[n] >= box_bot and low[n] < box_top
+
+                _vRatio = profile_src == "Volumen" ? nz(volume[n]) * vR : nz(volume[n]) * vR * hlc3[n]
+                array.set(vol_arr, x, array.get(vol_arr, x) + _vRatio)                
+    
+                if close[n] > open[n]
+                    array.set(bull_vol_arr, x, array.get(bull_vol_arr,x) + _vRatio)
+                else
+                    array.set(bear_vol_arr, x, array.get(bear_vol_arr,x) + _vRatio)
+    
+    f_initBoxes(box_arr)
+    f_initBoxes(_box)
+
+    for i = 1 to array.size(levels) - 1
+        _delta_vol      = nz(math.abs(array.get(bull_vol_arr, i - 1) - array.get(bear_vol_arr, i - 1)) )
+        max_delta_vol   := na(max_delta_vol) or _delta_vol > max_delta_vol ? _delta_vol : max_delta_vol
+        sum_delta_vol   += _delta_vol
+
+    _box_spacing    = (array.get(levels, 1) - array.get(levels, 0)) / 20
+
+    _box_list_above = array.new_float(0)
+    _box_list_below = array.new_float(0)
+
+    _max_width      = 20
+
+    for i = 1 to array.size(levels) - 1
+        _mid = math.round_to_mintick((array.get(levels, i) + array.get(levels, i - 1)) / 2)
+        _vol = array.get(vol_arr, i - 1)
+        
+        _bullVol = array.get(bull_vol_arr, i - 1)
+        _bearVol = array.get(bear_vol_arr, i - 1)
+        _totalVol = _bullVol + _bearVol
+        _bullPct = _totalVol > 0 ? (_bullVol / _totalVol) * 100 : 0
+        _bearPct = _totalVol > 0 ? (_bearVol / _totalVol) * 100 : 0
+      
+        profile_spacing     = 16
+        __width             = math.floor(_max_width * (_vol / array.max(vol_arr)))        
+        set_bg              = color.from_gradient(_vol, array.min(vol_arr), array.max(vol_arr), coldColor, hotColor)
+        
+        //PERFIL DE VOLUMEN
+        if show_profile
+            // Texto: volumen + porcentaje alcista (verde) y bajista (rojo)
+            string boxText = show_text ? str.tostring(_vol * _mid, format.volume) + " " + "🟢" + str.tostring(math.round(_bullPct, 1)) + "% " + "🔴" + str.tostring(math.round(_bearPct, 1)) + "%" : ""
+            
+            array.unshift(box_arr, box.new(
+             left           = bar_index + profile_spacing,
+             top            = array.get(levels, i - 1) + _box_spacing,
+             right          = bar_index + profile_spacing + __width,
+             bottom         = array.get(levels, i) - _box_spacing,
+             border_width   = 0,
+             bgcolor        = color.new(set_bg, 10),
+             text           = boxText,
+             text_color     = color.new(chart.fg_color, textTransparency),
+             text_size      = size.normal,
+             border_color   = color.new(#0037ff, 10),
+             text_halign    = text.align_left
+             ))
+
+        _delta_vol          = math.abs(_bullVol - _bearVol) 
+        __width             := math.min(_max_width, math.floor(_max_width * (_delta_vol / max_delta_vol)))
+        set_bg              := _bullVol > _bearVol ? midColor : hotColor
+        
+        array.push(_box_list_above, close[1] < array.get(levels, i - 1) and close[2] < array.get(levels, i - 1) and _bullVol < _bearVol and __width >= _max_width / 2 ? __width : 0)
+        array.push(_box_list_below, close[1] > array.get(levels, i - 1) and close[2] > array.get(levels, i - 1) and _bullVol > _bearVol and __width >= _max_width / 2 ? __width : 0)
+
+
+    //Caja de Resistencia
+    max_resist = array.indexof(_box_list_above, array.max(_box_list_above))
+    if array.max(_box_list_above) > 0 and show_sentiments
+
+        green_width_pre = f_preWidth(max_resist)
+        green_width     = math.ceil(green_width_pre * _max_width)
+        red_width       = _max_width - green_width
+        
+        _bullVol = array.get(bull_vol_arr, max_resist)
+        _bearVol = array.get(bear_vol_arr, max_resist)
+        _totalVol = _bullVol + _bearVol
+        _bullPct = _totalVol > 0 ? (_bullVol / _totalVol) * 100 : 0
+        _bearPct = _totalVol > 0 ? (_bearVol / _totalVol) * 100 : 0
+
+        //Configurando la caja de volumen de venta máximo arriba para Resistencia
+        array.unshift(_box, box.new(
+         left           = bar_index[bbars],
+         top            = array.get(levels, max_resist),
+         right          = bar_index + 16,
+         bottom         = array.get(levels, max_resist + 1),
+         extend         = extend.none,
+         bgcolor        = color.new(hotColor, 10),
+         border_width   = 0,
+         text_color     = color.white
+         ))
+
+        //Barras Animadas
+        lastrand = _max_width - 2
+        for kk = 0 to _max_width - 2 by 2
+            rand        = math.ceil(math.random(0, 2, 1))
+            lastrand    := lastrand-rand
+            array.unshift(_box, box.new(
+             left           = bar_index[2],
+             top            = array.get(levels, max_resist) + _box_spacing * kk,
+             right          = bar_index[2] + lastrand,
+             bottom         = array.get(levels, max_resist) + _box_spacing * (kk + 2),
+             bgcolor        = color.new(hotColor, 10),
+             border_width   =  0
+             ))
+
+        //Barra de Progreso de Volumen
+        _left   = bar_index[22]
+        _top    = array.get(levels, max_resist)
+        _bottom = array.get(levels, max_resist + 1)
+        array.unshift(_box, box.new(
+         left           = _left,
+         top            = _top,
+         right          = _left + green_width,
+         bottom         = _bottom,
+         bgcolor        = color.new(midColor, 10),
+         text           = "🟢" + str.tostring(math.round(_bullPct, 1)) + "%",
+         border_width   = 0,
+         text_color     = color.new(color.white, textTransparency),
+         text_size      = size.normal
+         ))
+        
+        array.unshift(_box, box.new(
+         left           = _left + green_width,
+         top            = _top,
+         right          = bar_index[2],
+         bottom         = _bottom,
+         bgcolor        = color.new(hotColor, 10),
+         text           = "🔴" + str.tostring(math.round(_bearPct, 1)) + "%",
+         border_width   = 0,
+         text_color     = color.new(color.white, textTransparency),
+         text_size      = size.normal
+         ))
+        
+    //Caja de Soporte    
+    max_support = array.indexof(_box_list_below, array.max(_box_list_below))
+    if array.max(_box_list_below) > 0 and show_sentiments
+        green_width_pre = f_preWidth(max_support)
+        green_width     = math.ceil(green_width_pre * _max_width)
+        red_width       = _max_width - green_width
+        
+        _bullVol = array.get(bull_vol_arr, max_support)
+        _bearVol = array.get(bear_vol_arr, max_support)
+        _totalVol = _bullVol + _bearVol
+        _bullPct = _totalVol > 0 ? (_bullVol / _totalVol) * 100 : 0
+        _bearPct = _totalVol > 0 ? (_bearVol / _totalVol) * 100 : 0
+
+        //Configurando la caja de volumen de compra máximo abajo para Soporte
+        array.unshift(_box, box.new(
+         left           = bar_index[bbars],
+         top            = array.get(levels, max_support),
+         right          = bar_index + 16,
+         bottom         = array.get(levels, max_support + 1),
+         bgcolor        = color.new(midColor, 10),
+         border_width   = 0
+         ))
+
+        //Barras Animadas
+        lastrand = 0
+        for kk = 0 to 18 by 2
+            rand        =   math.ceil(math.random(0, 2 ,1))
+            lastrand    :=  lastrand + rand
+            array.unshift(_box, box.new(
+             left           = bar_index[2],
+             top            = array.get(levels, max_support) + _box_spacing * kk,
+             right          = bar_index[2] + lastrand,
+             bottom         = array.get(levels, max_support) + _box_spacing * (kk + 2),
+             bgcolor        = color.new(midColor, 10),
+             border_width   = 0
+             ))
+
+        //Barra de Progreso de Volumen
+        _left   = bar_index[22]
+        _top    = array.get(levels,max_support)
+        _bottom = array.get(levels,max_support+1)
+        array.unshift(_box,box.new(
+         left           = _left,
+         top            = _top,
+         right          = _left + green_width,
+         bottom         = _bottom,
+         bgcolor        = color.new(midColor, 10),
+         text           = "🟢" + str.tostring(math.round(_bullPct, 1)) + "%",
+         border_width   = 0,
+         text_color     = color.new(color.white, textTransparency),
+         text_size      = size.normal
+         ))
+        array.unshift(_box,box.new(
+         left           = _left + green_width,
+         top            = _top,
+         right          = bar_index[2],
+         bottom         = _bottom,
+         bgcolor        = color.new(hotColor, 10),
+         text           = "🔴" + str.tostring(math.round(_bearPct, 1)) + "%",
+         border_width   = 0,
+         text_color     = color.new(color.white, textTransparency),
+         text_size      = size.normal
+         ))
