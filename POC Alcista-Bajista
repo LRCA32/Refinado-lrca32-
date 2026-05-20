@@ -1,0 +1,98 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © irca-pro
+
+//@version=6
+indicator("POC - Alcista/Bajista", overlay=true)
+
+lookback = input.int(300, "Período de Retroceso")
+rows = input.int(50, "Filas")
+
+// Controles de transparencia
+transparencia = input.int(70, "Transparencia %", minval=0, maxval=90)
+
+// Colores
+colorVerde = input.color(color.new(color.green, 0), "Color POC Alcista")
+colorRojo = input.color(color.new(color.red, 0), "Color POC Bajista")
+
+var line pocLine = na
+
+if barstate.islast
+    float hh = ta.highest(high, lookback)
+    float ll = ta.lowest(low, lookback)
+    
+    float step = (hh - ll) / rows
+    
+    float maxVol = 0.0
+    float pocPrice = na
+    
+    // Guardar valores en arrays
+    var float[] highs = array.new<float>()
+    var float[] lows = array.new<float>()
+    var float[] volumes = array.new<float>()
+    
+    // Llenar arrays con los datos históricos
+    for i = 0 to lookback - 1
+        array.push(highs, high[i])
+        array.push(lows, low[i])
+        array.push(volumes, volume[i])
+    
+    // Buscar POC
+    for r = 0 to rows - 1
+        float top = hh - (r * step)
+        float bot = top - step
+        
+        float volSum = 0.0
+        
+        for i = 0 to lookback - 1
+            float h = array.get(highs, i)
+            float l = array.get(lows, i)
+            float v = array.get(volumes, i)
+            
+            float overlapTop = math.min(h, top)
+            float overlapBot = math.max(l, bot)
+            
+            if overlapTop > overlapBot
+                float candleRange = h - l
+                if candleRange > 0
+                    float portion = (overlapTop - overlapBot) / candleRange
+                    volSum += v * portion
+        
+        if volSum > maxVol
+            maxVol := volSum
+            pocPrice := (top + bot) / 2
+    
+    // Limpiar arrays
+    array.clear(highs)
+    array.clear(lows)
+    array.clear(volumes)
+    
+    // ========== LÓGICA ALCISTA/BAJISTA ==========
+    // Si el POC está por DEBAJO del precio actual = SOPORTE = ALCISTA (VERDE)
+    // Si el POC está por ENCIMA del precio actual = RESISTENCIA = BAJISTA (ROJO)
+    
+    bool esAlcista = pocPrice < close   // POC debajo del precio = soporte
+    bool esBajista = pocPrice > close   // POC arriba del precio = resistencia
+    
+    // Aplicar transparencia a los colores
+    color colorFinal = na
+    
+    if esAlcista
+        colorFinal := color.new(colorVerde, transparencia)
+    else if esBajista
+        colorFinal := color.new(colorRojo, transparencia)
+    
+    // Borrar línea anterior
+    if not na(pocLine)
+        line.delete(pocLine)
+    
+    // Dibujar POC
+    if not na(pocPrice) and not na(colorFinal)
+        pocLine := line.new(
+             x1 = bar_index - lookback,
+             y1 = pocPrice,
+             x2 = bar_index,
+             y2 = pocPrice,
+             color = colorFinal,
+             width = 3,
+             extend = extend.none
+         )
