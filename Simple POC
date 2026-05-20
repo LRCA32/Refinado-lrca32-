@@ -1,0 +1,59 @@
+//@version=5
+indicator("Simple POC", overlay=true)
+
+lookback = input.int(300, "Lookback")
+rows      = input.int(50, "Rows")
+
+pocColor  = input.color(color.yellow)
+
+var line pocLine = na
+
+if barstate.islast
+
+    float hh = ta.highest(high, lookback)
+    float ll = ta.lowest(low, lookback)
+
+    float step = (hh - ll) / rows
+
+    float maxVol = 0.0
+    float pocPrice = na
+
+    // Buscar POC
+    for r = 0 to rows - 1
+
+        float top = hh - (r * step)
+        float bot = top - step
+
+        float volSum = 0.0
+
+        for i = 0 to lookback - 1
+
+            float overlapTop = math.min(high[i], top)
+            float overlapBot = math.max(low[i], bot)
+
+            if overlapTop > overlapBot
+
+                float candleRange = high[i] - low[i]
+
+                if candleRange > 0
+                    float portion = (overlapTop - overlapBot) / candleRange
+                    volSum += volume[i] * portion
+
+        if volSum > maxVol
+            maxVol := volSum
+            pocPrice := (top + bot) / 2
+
+    // borrar línea anterior
+    if not na(pocLine)
+        line.delete(pocLine)
+
+    // dibujar POC
+    pocLine := line.new(
+         x1 = bar_index - lookback,
+         y1 = pocPrice,
+         x2 = bar_index + 20,
+         y2 = pocPrice,
+         color = pocColor,
+         width = 3,
+         extend = extend.right
+     )
