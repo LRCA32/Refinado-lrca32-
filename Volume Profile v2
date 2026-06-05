@@ -1,0 +1,169 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © irca-pro
+
+//@version=6
+indicator("Volume Profile v2", overlay=true, max_lines_count=500, max_boxes_count=500)
+
+//═══════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN VOLUME PROFILE
+//═══════════════════════════════════════════════════════════════════════════════
+
+bbars      = input.int(500,  "Barras VP",        group="Volume Profile", minval=250, maxval=600)
+cnum       = input.int(49,   "Filas VP",         group="Volume Profile", minval=25,  maxval=55)
+separacion = -15
+color colorCalor = input.color(#f23645, "Calor (Vol Alto)", group="Volume Profile")
+color colorFrio  = input.color(#00bcd4, "Frío  (Vol Bajo)", group="Volume Profile")
+show_sentiments  = input.bool(true, "Mostrar Sentimientos (R/S)", group="Volume Profile")
+show_profile     = input.bool(true, "Mostrar Perfil", group="Volume Profile")
+show_all_boxes   = input.bool(true, "Mostrar Todas las Cajas", group="Volume Profile")
+show_text        = input.bool(true, "Mostrar Porcentajes", group="Volume Profile")
+int textTransparency = 50
+
+//═══════════════════════════════════════════════════════════════════════════════
+// VOLUME PROFILE
+//═══════════════════════════════════════════════════════════════════════════════
+
+top_vp  = ta.highest(bbars)
+bot_vp  = ta.lowest(bbars)
+step_vp = (top_vp - bot_vp) / cnum
+
+var vol_arr      = array.new_float(cnum + 1)
+var bull_vol_arr = array.new_float(cnum + 1)
+var bear_vol_arr = array.new_float(cnum + 1)
+float max_delta_vol = na
+
+var levels = array.new_float(cnum + 1)
+if last_bar_index - bar_index == 1
+    for x = 0 to cnum by 1
+        array.set(levels,       x, bot_vp + step_vp * x)
+        array.set(vol_arr,      x, 0)
+        array.set(bull_vol_arr, x, 0)
+        array.set(bear_vol_arr, x, 0)
+
+var box_arr = array.new_box(0)
+var _box    = array.new_box(0)
+
+f_initBoxes(box) =>
+    array_size = array.size(box)
+    for int v = 0 to array_size - 1
+        if array_size > 0
+            box.delete(array.get(box, v))
+    array.clear(box)
+
+f_preWidth(_max) =>
+    array.get(bull_vol_arr, _max) / (array.get(bull_vol_arr, _max) + array.get(bear_vol_arr, _max))
+
+if barstate.islast
+    for n = 0 to bbars
+        for x = 0 to cnum by 1
+            box_bot  = bot_vp + step_vp * x
+            box_top  = bot_vp + (step_vp * (x + 1))
+            box_diff = box_top - box_bot
+
+            vR = (high[n] >= box_top and low[n] <= box_bot) ?
+                  box_diff / (high[n] - low[n]) :
+                  low[n] > box_bot and low[n] < box_top ?
+                  (box_top - low[n]) / (high[n] - low[n]) :
+                  (high[n] > box_bot and high[n] < box_top) ?
+                  (high[n] - box_bot) / (high[n] - low[n]) : 0.00
+
+            if high[n] >= box_bot and low[n] < box_top
+                _vRatio = nz(volume[n]) * vR
+                array.set(vol_arr, x, array.get(vol_arr, x) + _vRatio)
+                if close[n] > open[n]
+                    array.set(bull_vol_arr, x, array.get(bull_vol_arr, x) + _vRatio)
+                else
+                    array.set(bear_vol_arr, x, array.get(bear_vol_arr, x) + _vRatio)
+
+    f_initBoxes(box_arr)
+    f_initBoxes(_box)
+
+    for i = 1 to array.size(levels) - 1
+        _delta_vol    = nz(math.abs(array.get(bull_vol_arr, i - 1) - array.get(bear_vol_arr, i - 1)))
+        max_delta_vol := na(max_delta_vol) or _delta_vol > max_delta_vol ? _delta_vol : max_delta_vol
+
+    _box_spacing    = (array.get(levels, 1) - array.get(levels, 0)) / 20
+    _box_list_above = array.new_float(0)
+    _box_list_below = array.new_float(0)
+    _max_width      = 18
+
+    for i = 1 to array.size(levels) - 1
+        _vol      = array.get(vol_arr, i - 1)
+        _bullVol  = array.get(bull_vol_arr, i - 1)
+        _bearVol  = array.get(bear_vol_arr, i - 1)
+        _totalVol = _bullVol + _bearVol
+        _bullPct  = _totalVol > 0 ? (_bullVol / _totalVol) * 100 : 50
+
+        profile_spacing = 14
+        __total_width   = math.floor(_max_width * (_vol / array.max(vol_arr)))
+        __bull_width    = math.floor(__total_width * (_bullPct / 100))
+        __bear_width    = __total_width - __bull_width
+
+        float t_vol    = _vol / array.max(vol_arr)
+        color barColor = color.from_gradient(t_vol, 0, 1, colorFrio, colorCalor)
+
+        if show_profile
+            if __bull_width > 0
+                array.unshift(box_arr, box.new(
+                     left=bar_index + profile_spacing + separacion,
+                     top=array.get(levels, i - 1) + _box_spacing,
+                     right=bar_index + profile_spacing + __bull_width + separacion,
+                     bottom=array.get(levels, i) - _box_spacing,
+                     border_width=0, bgcolor=color.new(barColor, 80),
+                     border_color=color.new(barColor, 100)))
+
+            if __bear_width > 0
+                array.unshift(box_arr, box.new(
+                     left=bar_index + profile_spacing + __bull_width + separacion,
+                     top=array.get(levels, i - 1) + _box_spacing,
+                     right=bar_index + profile_spacing + __total_width + separacion,
+                     bottom=array.get(levels, i) - _box_spacing,
+                     border_width=0, bgcolor=color.new(barColor, 80),
+                     border_color=color.new(barColor, 100)))
+
+            if show_text and __total_width > 10
+                array.unshift(box_arr, box.new(
+                     left=bar_index + profile_spacing + separacion + 2,
+                     top=array.get(levels, i - 1) + _box_spacing,
+                     right=bar_index + profile_spacing + __total_width + separacion,
+                     bottom=array.get(levels, i) - _box_spacing,
+                     border_width=0, bgcolor=color.new(color.black, 100),
+                     text=str.tostring(math.round(_bullPct)) + "%",
+                     text_color=color.new(color.white, textTransparency),
+                     text_size=size.tiny, text_halign=text.align_left))
+
+        _delta_vol  = math.abs(_bullVol - _bearVol)
+        delta_width = math.min(_max_width, math.floor(_max_width * (_delta_vol / max_delta_vol)))
+
+        array.push(_box_list_above, close[1] < array.get(levels, i - 1) and close[2] < array.get(levels, i - 1) and _bullVol < _bearVol and delta_width >= _max_width / 2 ? delta_width : 0)
+        array.push(_box_list_below, close[1] > array.get(levels, i - 1) and close[2] > array.get(levels, i - 1) and _bullVol > _bearVol and delta_width >= _max_width / 2 ? delta_width : 0)
+
+    if show_all_boxes
+        max_resist = array.indexof(_box_list_above, array.max(_box_list_above))
+        if array.max(_box_list_above) > 0 and show_sentiments
+            array.unshift(_box, box.new(
+                 left=bar_index[bbars] + separacion, top=array.get(levels, max_resist),
+                 right=bar_index + separacion, bottom=array.get(levels, max_resist + 1),
+                 extend=extend.none, bgcolor=color.new(colorFrio, 88),
+                 border_width=1, border_color=color.new(colorFrio, 55)))
+            array.unshift(_box, box.new(
+                 left=bar_index[18] + separacion, top=array.get(levels, max_resist),
+                 right=bar_index[2] + separacion, bottom=array.get(levels, max_resist + 1),
+                 bgcolor=color.new(color.black, 70), border_width=0,
+                 text="R", text_color=color.new(colorFrio, 0),
+                 text_size=size.small, text_halign=text.align_center))
+
+    if show_all_boxes
+        max_support = array.indexof(_box_list_below, array.max(_box_list_below))
+        if array.max(_box_list_below) > 0 and show_sentiments
+            array.unshift(_box, box.new(
+                 left=bar_index[bbars] + separacion, top=array.get(levels, max_support),
+                 right=bar_index + separacion, bottom=array.get(levels, max_support + 1),
+                 bgcolor=color.new(colorCalor, 88), border_width=1,
+                 border_color=color.new(colorCalor, 55)))
+            array.unshift(_box, box.new(
+                 left=bar_index[18] + separacion, top=array.get(levels, max_support),
+                 right=bar_index[2] + separacion, bottom=array.get(levels, max_support + 1),
+                 bgcolor=color.new(color.black, 70), border_width=0,
+                 text="S", text_color=color.new(colorCalor, 0),
+                 text_size=size.small, text_halign=text.align_center))
