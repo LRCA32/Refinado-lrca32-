@@ -1,0 +1,139 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © irca-pro
+
+//@version=6
+indicator("Polaridad — Cono Dual 🔵🔴", overlay=true, max_lines_count=500)
+
+//═══════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN
+//═══════════════════════════════════════════════════════════════════════════════
+
+periodoCono  = input.int(32,    "Periodo del Cono")
+mostrarMedia = input.bool(true, "Mostrar Media")
+rafagaRayos  = input.int(3,     "Rayos por Banda", minval=2, maxval=12)
+rafagaDelta  = input.float(0.02,"Dispersión Ráfaga", minval=0.01, maxval=0.30, step=0.01)
+sigmaFactor  = input.float(1.80,"Factor σ Banda 2", minval=0.5, maxval=4.0, step=0.05)
+longPivote   = input.int(10,    "Longitud del Pivote", minval=3, maxval=30)
+expiracion   = input.int(100,   "Expiración (barras)", minval=20, maxval=300)
+
+//═══════════════════════════════════════════════════════════════════════════════
+// VOLATILIDAD
+//═══════════════════════════════════════════════════════════════════════════════
+
+logRet   = math.log(close / close[1])
+volRaw   = ta.stdev(logRet, 60)
+volAnual = volRaw * math.sqrt(365)
+sig2     = volAnual * sigmaFactor
+
+//═══════════════════════════════════════════════════════════════════════════════
+// FUNCIÓN CONO
+//═══════════════════════════════════════════════════════════════════════════════
+
+cono(precio, t, vol, dir) =>
+    precio * math.exp(dir * vol * math.sqrt(t / 365))
+
+//═══════════════════════════════════════════════════════════════════════════════
+// DIBUJAR CONO
+//═══════════════════════════════════════════════════════════════════════════════
+
+dibujarCono(precioBase, indiceBase, colorUp, colorDown) =>
+    var float   m_prev    = na
+    var int     x_prev    = na
+    var float[] up_prev   = array.new_float(12, na)
+    var float[] down_prev = array.new_float(12, na)
+
+    for t = 0 to periodoCono
+        x     = indiceBase + t
+        media = cono(precioBase, t, 0, 1)
+
+        float[] up_cur  = array.new_float(12, na)
+        float[] down_cur = array.new_float(12, na)
+
+        for r = 0 to rafagaRayos - 1
+            fac = rafagaRayos > 1 ? (1 - rafagaDelta) + (2 * rafagaDelta * r / (rafagaRayos - 1)) : 1.0
+            array.set(up_cur,   r, cono(precioBase, t, sig2 * fac,  1))
+            array.set(down_cur, r, cono(precioBase, t, sig2 * fac, -1))
+
+        if t > 0 and not na(m_prev)
+            if mostrarMedia
+                line.new(x_prev, m_prev, x, media, color=color.new(#F9FF52, 55), width=1)
+
+            for r = 0 to rafagaRayos - 1
+                centro   = (rafagaRayos - 1) / 2.0
+                distNorm = math.abs(r - centro) / (centro + 0.001)
+                transp   = math.round(15 + 60 * distNorm)
+
+                pu  = array.get(up_cur,   r)
+                pd  = array.get(down_cur, r)
+                ppu = array.get(up_prev,  r)
+                ppd = array.get(down_prev,r)
+
+                if not na(pu) and not na(ppu)
+                    line.new(x_prev, ppu, x, pu, color=color.new(colorUp, transp), width=2)
+                if not na(pd) and not na(ppd)
+                    line.new(x_prev, ppd, x, pd, color=color.new(colorDown, transp), width=2)
+
+        m_prev := media
+        x_prev := x
+        for r = 0 to 11
+            array.set(up_prev,   r, array.get(up_cur,   r))
+            array.set(down_prev, r, array.get(down_cur, r))
+
+//═══════════════════════════════════════════════════════════════════════════════
+// ANCLAJE TORO (Mínimos)
+//═══════════════════════════════════════════════════════════════════════════════
+
+pivBajo = ta.pivotlow(low, longPivote, longPivote)
+
+var float pxTor = na
+var int   ixTor = na
+
+if not na(ixTor) and (bar_index - ixTor) > expiracion
+    pxTor := na
+    ixTor := na
+
+if not na(pivBajo)
+    pxTor := low[longPivote]
+    ixTor := bar_index - longPivote
+
+float baseTor = not na(pxTor) ? pxTor : close
+int   idxTor  = not na(ixTor) ? ixTor : bar_index
+
+if not na(idxTor) and (bar_index - idxTor) > 50
+    baseTor := close
+    idxTor  := bar_index
+
+//═══════════════════════════════════════════════════════════════════════════════
+// ANCLAJE BAJISTA (Máximos)
+//═══════════════════════════════════════════════════════════════════════════════
+
+pivAlto = ta.pivothigh(high, longPivote, longPivote)
+
+var float pxBear = na
+var int   ixBear = na
+
+if not na(ixBear) and (bar_index - ixBear) > expiracion
+    pxBear := na
+    ixBear := na
+
+if not na(pivAlto)
+    pxBear := high[longPivote]
+    ixBear := bar_index - longPivote
+
+float baseBear = not na(pxBear) ? pxBear : close
+int   idxBear  = not na(ixBear) ? ixBear : bar_index
+
+if not na(idxBear) and (bar_index - idxBear) > 50
+    baseBear := close
+    idxBear  := bar_index
+
+//═══════════════════════════════════════════════════════════════════════════════
+// DIBUJO - POLARIDAD 🔵🔴
+//═══════════════════════════════════════════════════════════════════════════════
+
+if barstate.islast
+    // POLO FRÍO 🧊 → Celeste + Azul
+    dibujarCono(baseTor, idxTor, #52F9FF, #5852FF)
+    
+    // POLO CALIENTE 🔥 → Rojo + Naranja
+    dibujarCono(baseBear, idxBear, #FF5852, #FFAE52)
