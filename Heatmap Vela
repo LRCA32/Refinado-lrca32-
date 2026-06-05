@@ -1,0 +1,40 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32
+
+//@version=6
+indicator("Heatmap Vela", overlay=true)
+
+//═══════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN
+//═══════════════════════════════════════════════════════════════════════════════
+
+// Heatmap
+lengthHeat       = input.int(20,    "Longitud Heatmap",   group="Heatmap")
+
+
+//═══════════════════════════════════════════════════════════════════════════════
+// HEATMAP — solo extremos
+//═══════════════════════════════════════════════════════════════════════════════
+
+c_cold    = #00bcd4
+c_hot     = #f23645
+c_mid     = #ffeb3b
+c_alcista = #26a69a
+c_bajista = #ef5350
+
+maximo      = ta.highest(high, lengthHeat)
+minimo      = ta.lowest(low,   lengthHeat)
+normalizado = (close - minimo) / (maximo - minimo)
+porcentaje  = normalizado * 99
+
+esFrio     = porcentaje < 15
+esCaliente = porcentaje > 85
+
+velaNeutral = close >= open ? c_alcista : c_bajista
+colorVela = porcentaje < 50 ? color.from_gradient(porcentaje, 0, 50, c_cold, c_mid) : color.from_gradient(porcentaje, 50, 100, c_mid, c_hot)
+
+barcolor(colorVela)
+plotcandle(open, high, low, close,
+     color       = colorVela,
+     wickcolor   = color.new(colorVela, 0),
+     bordercolor = colorVela)
