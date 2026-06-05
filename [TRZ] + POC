@@ -1,0 +1,313 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32
+
+//@version=6
+indicator("[TRZ] + POC", overlay=true)
+
+//═══════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN COMÚN
+//═══════════════════════════════════════════════════════════════════════════════
+
+calcMethod   = input.string('Atr',  'Método de Cálculo', options=['Atr','Stdev','Linreg'], group="T.R.Z")
+backpaint    = input.bool(true,  'Retroceso',                   group="T.R.Z")
+showExt      = input.bool(true,  'Mostrar Líneas Extendidas',   group="T.R.Z")
+hide_h_l     = input.bool(true,  'Ocultar Líneas Internas ZZ',  group="T.R.Z")
+mostrarTabla = input.bool(true,  'Mostrar Tabla',               group="T.R.Z")
+colorTextoR  = input.color(color.rgb(0, 0, 0), 'Color Texto R',        group="T.R.Z")
+
+// POC
+lookback      = input.int(300,  "Retroceso POC",      group="POC", minval=50)
+rows          = input.int(50,   "Filas POC",          group="POC", minval=10)
+transparencia = input.int(20,   "Transparencia POC %", group="POC", minval=0, maxval=90)
+colorVerdePOC = input.color(color.new(#00A1A1, 0), "Color POC Alcista", group="POC")
+colorRojoPOC  = input.color(color.new(#A10000, 0), "Color POC Bajista", group="POC")
+
+//═══════════════════════════════════════════════════════════════════════════════
+// PLAN A — Premium: Esmeralda & Coral
+//═══════════════════════════════════════════════════════════════════════════════
+
+length_A = 10
+mult_A   = 0.69
+len_zz_A = 34
+upCss_A  = color.rgb(0, 200, 150)          // Verde esmeralda
+dnCss_A  = color.rgb(255, 80, 100)         // Coral elegante
+cRAlc_A  = color.rgb(0, 230, 100)          // Verde vivo
+cRBaj_A  = color.rgb(255, 60, 80)          // Rojo vivo
+cAlza_A  = color.rgb(0, 200, 100, 60)      // Verde translúcido
+cBaja_A  = color.rgb(255, 70, 90, 60)      // Rojo translúcido
+
+//═══════════════════════════════════════════════════════════════════════════════
+// PLAN B — Premium: Zafiro & Ámbar
+//═══════════════════════════════════════════════════════════════════════════════
+
+length_B = 10
+mult_B   = 0.1
+len_zz_B = 55
+upCss_B  = color.rgb(50, 120, 255)         // Azul zafiro
+dnCss_B  = color.rgb(255, 180, 50)         // Ámbar dorado
+cRAlc_B  = color.rgb(80, 150, 255)         // Azul medio
+cRBaj_B  = color.rgb(255, 160, 30)         // Dorado
+cAlza_B  = color.rgb(50, 120, 255, 60)     // Azul translúcido
+cBaja_B  = color.rgb(255, 170, 40, 60)     // Dorado translúcido
+
+//═══════════════════════════════════════════════════════════════════════════════
+// FUNCIÓN PENDIENTE
+//═══════════════════════════════════════════════════════════════════════════════
+
+f_slope(method, length, mult) =>
+    n   = bar_index
+    src = close
+    switch method
+        'Atr'    => ta.atr(length) / length * mult
+        'Stdev'  => ta.stdev(src, length) / length * mult
+        'Linreg' => math.abs(ta.sma(src * n, length) - ta.sma(src, length) * ta.sma(n, length)) / ta.variance(n, length) / 2 * mult
+
+//═══════════════════════════════════════════════════════════════════════════════
+// PLAN A — TENDENCIA
+//═══════════════════════════════════════════════════════════════════════════════
+
+n = bar_index
+
+phA   = ta.pivothigh(length_A, length_A)
+plA   = ta.pivotlow(length_A, length_A)
+esPhA = not na(phA)
+esPlA = not na(plA)
+
+var float upperA    = 0.
+var float lowerA    = 0.
+var float slope_phA = 0.
+var float slope_plA = 0.
+
+slopeA    = f_slope(calcMethod, length_A, mult_A)
+slope_phA := esPhA ? slopeA : slope_phA
+slope_plA := esPlA ? slopeA : slope_plA
+upperA    := esPhA ? phA : upperA - slope_phA
+lowerA    := esPlA ? plA : lowerA + slope_plA
+
+var int uposA = 0
+var int dnosA = 0
+uposA := esPhA ? 0 : (close > upperA - slope_phA * length_A ? 1 : uposA)
+dnosA := esPlA ? 0 : (close < lowerA + slope_plA * length_A ? 1 : dnosA)
+
+offsetA = backpaint ? length_A : 0
+
+var line uptlA = line.new(na, na, na, na, color=upCss_A, style=line.style_dashed, extend=extend.right)
+var line dntlA = line.new(na, na, na, na, color=dnCss_A, style=line.style_dashed, extend=extend.right)
+
+if esPhA and showExt
+    uptlA.set_xy1(n - offsetA, backpaint ? phA : upperA - slope_phA * length_A)
+    uptlA.set_xy2(n - offsetA + 1, backpaint ? phA - slopeA : upperA - slope_phA * (length_A + 1))
+if esPlA and showExt
+    dntlA.set_xy1(n - offsetA, backpaint ? plA : lowerA + slope_plA * length_A)
+    dntlA.set_xy2(n - offsetA + 1, backpaint ? plA + slopeA : lowerA + slope_plA * (length_A + 1))
+
+plotshape(uposA > uposA[1] ? low  : na, "A: Ruptura Alcista", shape.labelup,   location.absolute, cRAlc_A, text="▲", textcolor=colorTextoR, size=size.tiny)
+plotshape(dnosA > dnosA[1] ? high : na, "A: Ruptura Bajista", shape.labeldown, location.absolute, cRBaj_A, text="▼", textcolor=colorTextoR, size=size.tiny)
+
+alertcondition(uposA > uposA[1], 'Plan A: Ruptura Alcista', 'Plan A — Precio rompió tendencia bajista')
+alertcondition(dnosA > dnosA[1], 'Plan A: Ruptura Bajista', 'Plan A — Precio rompió tendencia alcista')
+
+//═══════════════════════════════════════════════════════════════════════════════
+// PLAN A — ZIGZAG
+//═══════════════════════════════════════════════════════════════════════════════
+
+var line line_hA = na
+var line line_lA = na
+var line line_zA = na
+var int  idx_hA  = 0
+var int  idx_lA  = 0
+var bool trendA  = true
+
+upper_zzA = ta.highest(len_zz_A)
+lower_zzA = ta.lowest(len_zz_A)
+
+if high[1] == upper_zzA[1] and high < upper_zzA
+    idx_hA := bar_index[1]
+if low[1] == lower_zzA[1] and low > lower_zzA
+    idx_lA := bar_index[1]
+if high == upper_zzA
+    trendA := true
+if low == lower_zzA
+    trendA := false
+
+if not trendA and trendA[1] and not na(line_lA)
+    line.delete(line_hA)
+    line_hA := line.new(idx_hA, upper_zzA, bar_index, upper_zzA, color=hide_h_l ? cBaja_A : na, width=2, style=line.style_solid)
+    line.delete(line_zA)
+    line_zA := line.new(idx_lA, lower_zzA, idx_hA, upper_zzA, color=cBaja_A, width=2, style=line.style_dashed)
+
+if trendA and not trendA[1] and not na(line_hA)
+    line.delete(line_lA)
+    line_lA := line.new(idx_lA, lower_zzA, bar_index, lower_zzA, color=hide_h_l ? cAlza_A : na, width=2, style=line.style_solid)
+    line.delete(line_zA)
+    line_zA := line.new(idx_hA, upper_zzA, idx_lA, lower_zzA, color=cAlza_A, width=2, style=line.style_dashed)
+
+if not na(line_hA)
+    line_hA.set_x2(bar_index)
+if not na(line_lA)
+    line_lA.set_x2(bar_index)
+
+//═══════════════════════════════════════════════════════════════════════════════
+// PLAN B — TENDENCIA
+//═══════════════════════════════════════════════════════════════════════════════
+
+phB   = ta.pivothigh(length_B, length_B)
+plB   = ta.pivotlow(length_B, length_B)
+esPhB = not na(phB)
+esPlB = not na(plB)
+
+var float upperB    = 0.
+var float lowerB    = 0.
+var float slope_phB = 0.
+var float slope_plB = 0.
+
+slopeB    = f_slope(calcMethod, length_B, mult_B)
+slope_phB := esPhB ? slopeB : slope_phB
+slope_plB := esPlB ? slopeB : slope_plB
+upperB    := esPhB ? phB : upperB - slope_phB
+lowerB    := esPlB ? plB : lowerB + slope_plB
+
+var int uposB = 0
+var int dnosB = 0
+uposB := esPhB ? 0 : (close > upperB - slope_phB * length_B ? 1 : uposB)
+dnosB := esPlB ? 0 : (close < lowerB + slope_plB * length_B ? 1 : dnosB)
+
+offsetB = backpaint ? length_B : 0
+
+var line uptlB = line.new(na, na, na, na, color=upCss_B, style=line.style_dashed, extend=extend.right)
+var line dntlB = line.new(na, na, na, na, color=dnCss_B, style=line.style_dashed, extend=extend.right)
+
+if esPhB and showExt
+    uptlB.set_xy1(n - offsetB, backpaint ? phB : upperB - slope_phB * length_B)
+    uptlB.set_xy2(n - offsetB + 1, backpaint ? phB - slopeB : upperB - slope_phB * (length_B + 1))
+if esPlB and showExt
+    dntlB.set_xy1(n - offsetB, backpaint ? plB : lowerB + slope_plB * length_B)
+    dntlB.set_xy2(n - offsetB + 1, backpaint ? plB + slopeB : lowerB + slope_plB * (length_B + 1))
+
+plotshape(uposB > uposB[1] ? low  : na, "B: Ruptura Alcista", shape.labelup,   location.absolute, cRAlc_B, text="▲", textcolor=colorTextoR, size=size.tiny)
+plotshape(dnosB > dnosB[1] ? high : na, "B: Ruptura Bajista", shape.labeldown, location.absolute, cRBaj_B, text="▼", textcolor=colorTextoR, size=size.tiny)
+
+alertcondition(uposB > uposB[1], 'Plan B: Ruptura Alcista', 'Plan B — Precio rompió tendencia bajista')
+alertcondition(dnosB > dnosB[1], 'Plan B: Ruptura Bajista', 'Plan B — Precio rompió tendencia alcista')
+
+//═══════════════════════════════════════════════════════════════════════════════
+// PLAN B — ZIGZAG
+//═══════════════════════════════════════════════════════════════════════════════
+
+var line line_hB = na
+var line line_lB = na
+var line line_zB = na
+var int  idx_hB  = 0
+var int  idx_lB  = 0
+var bool trendB  = true
+
+upper_zzB = ta.highest(len_zz_B)
+lower_zzB = ta.lowest(len_zz_B)
+
+if high[1] == upper_zzB[1] and high < upper_zzB
+    idx_hB := bar_index[1]
+if low[1] == lower_zzB[1] and low > lower_zzB
+    idx_lB := bar_index[1]
+if high == upper_zzB
+    trendB := true
+if low == lower_zzB
+    trendB := false
+
+if not trendB and trendB[1] and not na(line_lB)
+    line.delete(line_hB)
+    line_hB := line.new(idx_hB, upper_zzB, bar_index, upper_zzB, color=hide_h_l ? cBaja_B : na, width=2, style=line.style_solid)
+    line.delete(line_zB)
+    line_zB := line.new(idx_lB, lower_zzB, idx_hB, upper_zzB, color=cBaja_B, width=2, style=line.style_dashed)
+
+if trendB and not trendB[1] and not na(line_hB)
+    line.delete(line_lB)
+    line_lB := line.new(idx_lB, lower_zzB, bar_index, lower_zzB, color=hide_h_l ? cAlza_B : na, width=2, style=line.style_solid)
+    line.delete(line_zB)
+    line_zB := line.new(idx_hB, upper_zzB, idx_lB, lower_zzB, color=cAlza_B, width=2, style=line.style_dashed)
+
+if not na(line_hB)
+    line_hB.set_x2(bar_index)
+if not na(line_lB)
+    line_lB.set_x2(bar_index)
+
+//═══════════════════════════════════════════════════════════════════════════════
+// POC SIMPLE
+//═══════════════════════════════════════════════════════════════════════════════
+
+var line  pocLine  = na
+var label pocLabel = na
+
+if barstate.islast
+    float hh   = ta.highest(high, lookback)
+    float ll   = ta.lowest(low,   lookback)
+    float step = (hh - ll) / rows
+
+    float maxVol   = 0.0
+    float pocPrice = na
+
+    var float[] highs   = array.new<float>()
+    var float[] lows    = array.new<float>()
+    var float[] volumes = array.new<float>()
+
+    for i = 0 to lookback - 1
+        array.push(highs,   high[i])
+        array.push(lows,    low[i])
+        array.push(volumes, volume[i])
+
+    for r = 0 to rows - 1
+        float top    = hh - (r * step)
+        float bot    = top - step
+        float volSum = 0.0
+
+        for i = 0 to lookback - 1
+            float h = array.get(highs,   i)
+            float l = array.get(lows,    i)
+            float v = array.get(volumes, i)
+
+            float overlapTop = math.min(h, top)
+            float overlapBot = math.max(l, bot)
+
+            if overlapTop > overlapBot
+                float candleRange = h - l
+                if candleRange > 0
+                    float portion = (overlapTop - overlapBot) / candleRange
+                    volSum += v * portion
+
+        if volSum > maxVol
+            maxVol    := volSum
+            pocPrice  := (top + bot) / 2
+
+    array.clear(highs)
+    array.clear(lows)
+    array.clear(volumes)
+
+    bool  alcista  = pocPrice < close
+    color colorPOC = alcista ? color.new(colorVerdePOC, transparencia) : color.new(colorRojoPOC, transparencia)
+    string flecha  = alcista ? "▲" : "▼"
+    string txtPOC  = "POC " + flecha + " " + str.tostring(pocPrice, format.mintick)
+
+    if not na(pocLine)
+        line.delete(pocLine)
+    if not na(pocLabel)
+        label.delete(pocLabel)
+
+    if not na(pocPrice)
+        pocLine := line.new(
+             x1=bar_index - lookback, y1=pocPrice,
+             x2=bar_index + 20,       y2=pocPrice,
+             color=colorPOC, width=2, extend=extend.right)
+
+        pocLabel := label.new(
+             x=bar_index + 22, y=pocPrice,
+             text=txtPOC, color=color.new(color.black, 100),
+             textcolor=colorPOC, style=label.style_none, size=size.small)
+    
+    // Marca de agua
+    var table wmTable = na
+    if na(wmTable)
+        wmTable := table.new(position.bottom_right, 1, 1, bgcolor = color.new(#242423, 100))
+    table.cell(wmTable, 0, 0, "IRCA PRO | TRADER", 
+               text_color = color.rgb(88, 88, 88), 
+               text_size = size.small, 
+               text_halign = text.align_center, 
+               bgcolor = color.new(#242423, 100))
