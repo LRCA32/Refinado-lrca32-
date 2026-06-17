@@ -1,0 +1,54 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0
+// © irca-pro
+
+//@version=6
+indicator("EMA + 4H Tracker", overlay=true)
+
+// ═══════════════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════════════
+input_group_1 = "⚡ Medias Móviles"
+
+per_1   = input.int(8,   "Periodo EMA Rápida",   minval=1, group=input_group_1)
+per_2   = input.int(20,  "Periodo LWMA/EMA",     minval=1, group=input_group_1)
+per_3   = input.int(50,  "Periodo SMA Sesión",   minval=1, group=input_group_1)
+per_4   = input.int(200, "Periodo SMA Estructura", minval=1, group=input_group_1)
+
+col_1   = input.color(color.rgb(0, 255, 255, 20), "Color EMA Rápida (Cian)",      group=input_group_1)
+col_2   = input.color(color.rgb(255, 0, 128, 20), "Color LWMA Pullback (Magenta)", group=input_group_1)
+col_3   = input.color(color.rgb(255, 204, 0, 20),   "Color SMA Sesión (Amarillo)",   group=input_group_1)
+col_4   = input.color(color.rgb(0, 255, 102, 20), "Color SMA Estructura (Verde)",  group=input_group_1)
+
+usar_lwma = input.bool(true, "Usar LWMA en periodo 20 (false = EMA)", group=input_group_1)
+
+// ═══════════════════════════════════════════════════════════════════
+// NIVELES HTF — solo 4H
+// ═══════════════════════════════════════════════════════════════════
+
+mostrarH4 = input.bool(true, "Mostrar 4H", group="📈 Niveles HTF")
+
+// Al poner [1] dentro de la función de seguridad, te aseguras de que 
+// la vela de 4H ya esté CERRADA antes de pintar sus niveles en M1.
+h4_high = request.security(syminfo.tickerid, "240", high[1], lookahead=barmerge.lookahead_off)
+h4_low  = request.security(syminfo.tickerid, "240", low[1],  lookahead=barmerge.lookahead_off)
+h4_cls  = request.security(syminfo.tickerid, "240", close[1], lookahead=barmerge.lookahead_off)
+// ═══════════════════════════════════════════════════════════════════
+// CÁLCULO DE MEDIAS
+// ═══════════════════════════════════════════════════════════════════
+
+ma_1 = ta.ema(close, per_1)
+ma_2 = usar_lwma ? ta.wma(close, per_2) : ta.ema(close, per_2)
+ma_3 = ta.sma(close, per_3)
+ma_4 = ta.sma(close, per_4)
+
+// ═══════════════════════════════════════════════════════════════════
+// PLOTS
+// ═══════════════════════════════════════════════════════════════════
+plot(ma_1, "EMA 8 — Gatillo",      color=col_1, linewidth=2)
+plot(ma_2, "LWMA 20 — Pullback",   color=col_2, linewidth=2)
+plot(ma_3, "SMA 50 — Sesión",      color=col_3, linewidth=2)
+plot(ma_4, "SMA 200 — Estructura", color=col_4, linewidth=3)
+
+plot(mostrarH4 ? h4_high : na, "4H High",  color=color.rgb(0, 187, 212, 20),  linewidth=1, style=plot.style_stepline)
+plot(mostrarH4 ? h4_low  : na, "4H Low",   color=color.rgb(242, 54, 69, 10),  linewidth=1, style=plot.style_stepline)
+plot(mostrarH4 ? h4_cls  : na, "4H Close", color=color.rgb(255, 235, 59, 20), linewidth=1, style=plot.style_stepline)
