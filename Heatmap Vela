@@ -8,9 +8,7 @@ indicator("Heatmap Vela", overlay=true)
 // CONFIGURACIÓN
 //═══════════════════════════════════════════════════════════════════════════════
 
-// Heatmap
-lengthHeat       = input.int(20,    "Longitud Heatmap",   group="Heatmap")
-
+lengthHeat = input.int(20, "Longitud Heatmap", group="Heatmap")
 
 //═══════════════════════════════════════════════════════════════════════════════
 // HEATMAP — solo extremos
@@ -31,7 +29,7 @@ esFrio     = porcentaje < 15
 esCaliente = porcentaje > 85
 
 velaNeutral = close >= open ? c_alcista : c_bajista
-colorVela = porcentaje < 50 ? color.from_gradient(porcentaje, 0, 50, c_cold, c_mid) : color.from_gradient(porcentaje, 50, 100, c_mid, c_hot)
+colorVela = porcentaje < 50 ? color.from_gradient(porcentaje, 0, 50, c_hot, c_mid) : color.from_gradient(porcentaje, 50, 100, c_mid, c_cold)
 
 barcolor(colorVela)
 plotcandle(open, high, low, close,
