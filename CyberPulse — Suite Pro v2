@@ -1,0 +1,122 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © irca-pro — Modified/Combined
+
+//@version=6
+indicator("CyberPulse — Suite Pro v2", overlay=true)
+
+// ═══════════════════════════════════════════════════════════════════
+// TEMA DE COLOR
+// ═══════════════════════════════════════════════════════════════════
+group_tema = "Tema de Color"
+tema = input.string("Neón", "Paleta", options=["Neón", "Industrial", "Cyberpunk"], group=group_tema)
+
+// Paleta Neón (actual)
+color_naranjo_neon = input.color(color.rgb(255, 107, 0, 50), "Neón — Naranjo", group=group_tema, inline="neon")
+color_verde_neon   = input.color(color.rgb(57, 255, 20, 50), "Verde", group=group_tema, inline="neon")
+color_pullback_neon = input.color(color.rgb(192, 86, 33, 0), "Pullback", group=group_tema, inline="neon")
+
+// Paleta Industrial
+color_naranjo_ind = input.color(color.rgb(192, 86, 33, 50), "Industrial — Naranjo", group=group_tema, inline="ind")
+color_verde_ind   = input.color(color.rgb(160, 174, 192, 50), "Verde", group=group_tema, inline="ind")
+color_pullback_ind = input.color(color.rgb(74, 85, 104, 0), "Pullback", group=group_tema, inline="ind")
+
+// Paleta Cyberpunk
+color_naranjo_cp = input.color(color.rgb(224, 64, 251, 50), "Cyberpunk — Naranjo", group=group_tema, inline="cp")
+color_verde_cp   = input.color(color.rgb(0, 229, 255, 50), "Verde", group=group_tema, inline="cp")
+color_pullback_cp = input.color(color.rgb(255, 214, 0, 0), "Pullback", group=group_tema, inline="cp")
+
+color_sma50  = tema == "Neón" ? color_naranjo_neon : tema == "Industrial" ? color_naranjo_ind : color_naranjo_cp
+color_sma200 = tema == "Neón" ? color_verde_neon   : tema == "Industrial" ? color_verde_ind   : color_verde_cp
+color_pullback_tema = tema == "Neón" ? color_pullback_neon : tema == "Industrial" ? color_pullback_ind : color_pullback_cp
+
+// ═══════════════════════════════════════════════════════════════════
+// MEDIAS MÓVILES INSTITUCIONALES (50 SMA & 200 SMA)
+// ═══════════════════════════════════════════════════════════════════
+group_inst  = "Medias Institucionales"
+mostrar_50  = input.bool(true, "Mostrar SMA 50 (Tendencia Media)", group=group_inst)
+mostrar_200 = input.bool(true, "Mostrar SMA 200 (Tendencia Mayor)", group=group_inst)
+
+trans_fondo = input.int(95, "Transparencia Fondo SMA", minval=0, maxval=100, group=group_inst)
+
+sma_50  = ta.sma(close, 50)
+sma_200 = ta.sma(close, 200)
+
+p_sma50  = plot(mostrar_50 ? sma_50 : na, "SMA 50", color=color_sma50, linewidth=2)
+p_sma200 = plot(mostrar_200 ? sma_200 : na, "SMA 200", color=color_sma200, linewidth=2)
+
+fill_color_sma = sma_50 > sma_200 ? color.new(color_sma200, trans_fondo) : color.new(color_sma50, trans_fondo)
+fill(p_sma50, p_sma200, color=fill_color_sma, title="Fondo SMA 50/200")
+
+// ═══════════════════════════════════════════════════════════════════
+// LWMA/EMA Periodo 14 (Pullback)
+// ═══════════════════════════════════════════════════════════════════
+group_ma  = "LWMA/EMA Pullback"
+per_2     = input.int(14, "Periodo MA", minval=1, group=group_ma)
+usar_lwma = input.bool(true, "Usar LWMA (Sino, usa EMA)", group=group_ma)
+
+ma_2 = usar_lwma ? ta.wma(close, per_2) : ta.ema(close, per_2)
+plot(ma_2, "LWMA/EMA — Pullback", color=color.new(color_pullback_tema, 20), linewidth=1)
+
+// ═══════════════════════════════════════════════════════════════════
+// TRI TENDENCIA (HalfTrend Multi-Amplitud)
+// ═══════════════════════════════════════════════════════════════════
+group_ht = "Tri Tendencia"
+amp1 = input.int(15, "Amplitud 1 (Rápida)",  minval=1, group=group_ht)
+amp2 = input.int(30, "Amplitud 2 (Media)",   minval=1, group=group_ht)
+mostrar_3 = input.bool(true, "Mostrar 3ra línea", group=group_ht)
+amp3 = input.int(55, "Amplitud 3 (Lenta)",   minval=1, group=group_ht)
+
+color_alcista_ht = input.color(#00e676, "Color Alcista (todas)", group=group_ht)
+color_bajista_ht = input.color(#ff0000, "Color Bajista (todas)", group=group_ht)
+
+f_halftrend(int amplitude) =>
+    var int trend = 0
+    var int nextTrend = 0
+    var float maxLowPrice  = nz(low[1], low)
+    var float minHighPrice = nz(high[1], high)
+    var float up   = 0.0
+    var float down = 0.0
+
+    highPrice = high[math.abs(ta.highestbars(amplitude))]
+    lowPrice  = low[math.abs(ta.lowestbars(amplitude))]
+    highma    = ta.sma(high, amplitude)
+    lowma     = ta.sma(low, amplitude)
+
+    if nextTrend == 1
+        maxLowPrice := math.max(lowPrice, maxLowPrice)
+        if highma < maxLowPrice and close < nz(low[1], low)
+            trend        := 1
+            nextTrend    := 0
+            minHighPrice := highPrice
+    else
+        minHighPrice := math.min(highPrice, minHighPrice)
+        if lowma > minHighPrice and close > nz(high[1], high)
+            trend       := 0
+            nextTrend   := 1
+            maxLowPrice := lowPrice
+
+    if trend == 0
+        if not na(trend[1]) and trend[1] != 0
+            up := na(down[1]) ? down : down[1]
+        else
+            up := na(up[1]) ? maxLowPrice : math.max(maxLowPrice, up[1])
+    else
+        if not na(trend[1]) and trend[1] != 1
+            down := na(up[1]) ? up : up[1]
+        else
+            down := na(down[1]) ? minHighPrice : math.min(minHighPrice, down[1])
+
+    ht = trend == 0 ? up : down
+    [ht, trend]
+
+[ht1, trend1] = f_halftrend(amp1)
+[ht2, trend2] = f_halftrend(amp2)
+[ht3, trend3] = f_halftrend(amp3)
+
+htColor1 = trend1 == 0 ? color.new(color_alcista_ht, 35) : color.new(color_bajista_ht, 35)
+htColor2 = trend2 == 0 ? color.new(color_alcista_ht, 35) : color.new(color_bajista_ht, 35)
+htColor3 = trend3 == 0 ? color.new(color_alcista_ht, 35) : color.new(color_bajista_ht, 35)
+
+plot(ht1, title="Semi Tendencia 1", linewidth=2, color=htColor1, style=plot.style_linebr, linestyle=plot.linestyle_dotted)
+plot(ht2, title="Semi Tendencia 2", linewidth=2, color=htColor2, style=plot.style_linebr, linestyle=plot.linestyle_dotted)
+plot(mostrar_3 ? ht3 : na, title="Semi Tendencia 3", linewidth=2, color=htColor3, style=plot.style_linebr, linestyle=plot.linestyle_dotted)
