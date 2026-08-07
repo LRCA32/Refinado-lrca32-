@@ -1,0 +1,351 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © lrca32 
+
+//@version=6
+indicator("CyberPulse - Multi Tunel de Viento + Mapa de Liquidaciones", overlay=true, max_boxes_count=500, max_labels_count=100, max_lines_count=500, max_bars_back=5000)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN DETECCIÓN LIQUIDACIONES (zonas por pivote)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+grpDetection = "Detección de Liquidaciones"
+lookbackBars = input.int(400, "Barras de Retrospectiva", minval=100, maxval=2000, group=grpDetection, tooltip="Número de barras históricas para analizar niveles de liquidación")
+pivotWidth = input.int(5, "Ancho del Pivote", minval=1, maxval=20, group=grpDetection, tooltip="Barras a cada lado para confirmación del pivote - valores más altos = niveles más fuertes")
+secondaryPivot = input.int(3, "Ancho del Pivote Secundario", minval=0, maxval=15, group=grpDetection, tooltip="Ancho de pivote adicional más pequeño para más niveles de liquidación. Establecer a 0 para deshabilitar")
+atrLength = input.int(100, "Longitud ATR", minval=10, maxval=500, group=grpDetection, tooltip="Periodo ATR para calcular la altura de la zona")
+atrBandPct = input.float(0.08, "% Banda ATR", minval=0.01, maxval=0.5, step=0.01, group=grpDetection, tooltip="Altura de la zona como porcentaje del ATR")
+minWeight = input.float(0.0, "Peso Mínimo del Nivel", minval=0.0, step=100000.0, group=grpDetection, tooltip="Peso de volumen mínimo para mostrar un nivel - aumentar para filtrar niveles débiles")
+extendBars = input.int(50, "Extender Niveles No Alcanzados (barras)", minval=0, maxval=200, group=grpDetection, tooltip="Proyectar niveles no tocados hacia adelante este número de barras")
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN VISUAL - ZONAS DE LIQUIDACIÓN
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+grpVisual = "Visual - Zonas de Liquidación"
+longLiqColor = input.color(#00e676, "Color Liquidación Larga", group=grpVisual, tooltip="Color para zonas de liquidación larga/compra (debajo del precio) - verde paleta termica")
+shortLiqColor = input.color(#ff3d00, "Color Liquidación Corta", group=grpVisual, tooltip="Color para zonas de liquidación corta/venta (encima del precio) - rojo paleta termica")
+heatContrast = input.float(0.4, "Contraste de Calor", minval=0.1, maxval=3.0, step=0.1, group=grpVisual, tooltip="Más alto = más separación entre niveles débiles y fuertes")
+touchedTransparency = input.int(15, "Visibilidad Nivel Alcanzado", minval=0, maxval=100, group=grpVisual, tooltip="Más bajo = más transparente cuando es alcanzado")
+keepTouched = input.bool(true, "Mantener Niveles Alcanzados", group=grpVisual, tooltip="Si está deshabilitado, los niveles desaparecen cuando el precio los cruza")
+wickWidth = input.int(2, "Grosor Mechón", minval=1, maxval=5, group=grpVisual, tooltip="Grosor de la línea vertical (mechón) al final del nivel")
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// CONFIGURACIÓN VISUAL - TUNEL DE VIENTO (fondo ambiental)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+grpViento = "Visual - Tunel de Viento (fondo)"
+mostrarViento = input.bool(true, "Mostrar Tunel de Viento", group=grpViento)
+numTuneles = input.int(10, "Cantidad de Túneles", minval=1, maxval=20, group=grpViento, tooltip="Cada túnel es un bloque independiente calculado sobre su propio tramo de historial, encadenados hacia atrás. Se clampea automáticamente para respetar el límite de 500 boxes y el máximo de historial referenciable")
+lookbackViento = input.int(200, "Barras por Túnel", minval=20, maxval=2000, group=grpViento)
+filasViento = input.int(60, "Filas del heatmap", minval=5, maxval=150, group=grpViento)
+margenVela = input.int(2, "Margen antes de la vela actual", minval=0, maxval=20, group=grpViento)
+transpFriaViento = input.int(92, "Transparencia zona fria", minval=0, maxval=99, group=grpViento)
+transpCalienteViento = input.int(60, "Transparencia zona caliente", minval=0, maxval=99, group=grpViento, tooltip="Mantener mas alto que las zonas de liquidacion para que el viento quede de fondo")
+mostrarBordeViento = input.bool(true, "Mostrar borde del heatmap", group=grpViento)
+colorBordeViento = input.color(#ffd600, "Color del borde", group=grpViento)
+anchoBordeViento = input.int(2, "Grosor del borde", minval=1, maxval=5, group=grpViento)
+
+c_cold = input.color(#00e676, "Color Frio", group=grpViento)
+c_mid  = input.color(#ffd600, "Color Medio", group=grpViento)
+c_hot  = input.color(#ff3d00, "Color Caliente", group=grpViento)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// VOLUMEN DEL SÍMBOLO ACTUAL
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+finalVolume = volume
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// CÁLCULO DEL PESO DE LIQUIDACIÓN
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+priceRange = (high - low) * 100.0
+liquidationWeight = finalVolume * priceRange
+
+weightMax = math.min(ta.highest(liquidationWeight, lookbackBars), 10000000000)
+weightMin = ta.lowest(liquidationWeight, lookbackBars)
+weightMin := weightMin == weightMax ? weightMax * 0.85 : weightMin
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// FUNCIÓN DE COLOR GRADIENTE - ZONAS DE LIQUIDACIÓN
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+getGradientColor(float weight, int side, float minVal, float maxVal) =>
+    baseColor = side == 1 ? longLiqColor : shortLiqColor
+    valueRange = maxVal - minVal
+    normalized = valueRange != 0 ? (weight - minVal) / valueRange : 0.0
+    normalized := math.max(0.0, math.min(1.0, normalized))
+    adjusted = math.pow(normalized, heatContrast)
+    color.from_gradient(adjusted, 0.0, 1.0, color.new(baseColor, 92), color.new(baseColor, 10))
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ALMACENAMIENTO DE NIVELES Y MECHONES
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var box[] levelBoxes = array.new<box>()
+var int[] levelSides = array.new<int>()
+var bool[] levelHits = array.new<bool>()
+var float[] levelWeights = array.new<float>()
+var bool[] levelFrozen = array.new<bool>()
+var int[] levelLeftBar = array.new<int>()
+var int[] levelLeftTime = array.new<int>()
+var float[] levelTop = array.new<float>()
+var float[] levelBottom = array.new<float>()
+var int[] levelRightTime = array.new<int>()
+var line[] levelWicks = array.new<line>()
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// CREAR NUEVO NIVEL DE LIQUIDACIÓN (CON MECHÓN)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+createLevel(float topPrice, float bottomPrice, int side, float weight, int leftBar, int leftTime, float minVal, float maxVal) =>
+    levelColor = getGradientColor(weight, side, minVal, maxVal)
+
+    barTimeGap = nz(time - time[1], 0)
+    rightTime = time + barTimeGap * extendBars
+
+    newBox = box.new(leftTime, topPrice, rightTime, bottomPrice, bgcolor=levelColor, border_color=na, xloc=xloc.bar_time)
+    newWick = line.new(rightTime, topPrice, rightTime, bottomPrice, xloc=xloc.bar_time, color=levelColor, width=wickWidth, extend=extend.none)
+
+    array.push(levelBoxes, newBox)
+    array.push(levelSides, side)
+    array.push(levelHits, false)
+    array.push(levelWeights, weight)
+    array.push(levelFrozen, false)
+    array.push(levelLeftBar, leftBar)
+    array.push(levelLeftTime, leftTime)
+    array.push(levelTop, topPrice)
+    array.push(levelBottom, bottomPrice)
+    array.push(levelRightTime, rightTime)
+    array.push(levelWicks, newWick)
+
+    if array.size(levelBoxes) > lookbackBars
+        array.shift(levelBoxes).delete()
+        array.shift(levelSides)
+        array.shift(levelHits)
+        array.shift(levelWeights)
+        array.shift(levelFrozen)
+        array.shift(levelLeftBar)
+        array.shift(levelLeftTime)
+        array.shift(levelTop)
+        array.shift(levelBottom)
+        array.shift(levelRightTime)
+
+        oldWick = array.shift(levelWicks)
+        if not na(oldWick)
+            oldWick.delete()
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// DETECCIÓN DE PIVOTES Y CREACIÓN DE NIVELES
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+atrValue = ta.atr(atrLength) * atrBandPct
+
+pivotHigh = ta.pivothigh(high, pivotWidth, pivotWidth)
+pivotLow = ta.pivotlow(low, pivotWidth, pivotWidth)
+
+if not na(pivotHigh)
+    pivotBar = bar_index - pivotWidth
+    weight = liquidationWeight[pivotWidth]
+    if not na(weight) and weight >= minWeight
+        topPrice = pivotHigh + atrValue
+        bottomPrice = pivotHigh
+        createLevel(topPrice, bottomPrice, -1, weight, pivotBar, time[pivotWidth], weightMin, weightMax)
+
+if not na(pivotLow)
+    pivotBar = bar_index - pivotWidth
+    weight = liquidationWeight[pivotWidth]
+    if not na(weight) and weight >= minWeight
+        topPrice = pivotLow
+        bottomPrice = pivotLow - atrValue
+        createLevel(topPrice, bottomPrice, 1, weight, pivotBar, time[pivotWidth], weightMin, weightMax)
+
+if secondaryPivot > 0
+    pivotHigh2 = ta.pivothigh(high, secondaryPivot, secondaryPivot)
+    pivotLow2 = ta.pivotlow(low, secondaryPivot, secondaryPivot)
+
+    if not na(pivotHigh2)
+        pivotBar = bar_index - secondaryPivot
+        weight = liquidationWeight[secondaryPivot]
+        if not na(weight) and weight >= minWeight
+            topPrice = pivotHigh2 + atrValue
+            bottomPrice = pivotHigh2
+            createLevel(topPrice, bottomPrice, -1, weight, pivotBar, time[secondaryPivot], weightMin, weightMax)
+
+    if not na(pivotLow2)
+        pivotBar = bar_index - secondaryPivot
+        weight = liquidationWeight[secondaryPivot]
+        if not na(weight) and weight >= minWeight
+            topPrice = pivotLow2
+            bottomPrice = pivotLow2 - atrValue
+            createLevel(topPrice, bottomPrice, 1, weight, pivotBar, time[secondaryPivot], weightMin, weightMax)
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// ACTUALIZAR NIVELES EXISTENTES Y SUS MECHONES
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+i = 0
+while i < array.size(levelBoxes)
+    currentBox = array.get(levelBoxes, i)
+    currentWick = array.get(levelWicks, i)
+    leftTime = array.get(levelLeftTime, i)
+    topPrice = array.get(levelTop, i)
+    bottomPrice = array.get(levelBottom, i)
+
+    currentBox.set_left(leftTime)
+    currentBox.set_top(topPrice)
+    currentBox.set_bottom(bottomPrice)
+
+    isFrozen = array.get(levelFrozen, i)
+    barTimeGap = nz(time - time[1], 0)
+    newRightTime = isFrozen ? array.get(levelRightTime, i) : time + barTimeGap * extendBars
+
+    currentBox.set_right(newRightTime)
+
+    if not na(currentWick)
+        currentWick.set_x1(newRightTime)
+        currentWick.set_x2(newRightTime)
+        currentWick.set_y1(topPrice)
+        currentWick.set_y2(bottomPrice)
+
+    if bar_index - array.get(levelLeftBar, i) > lookbackBars
+        currentBox.delete()
+        if not na(currentWick)
+            currentWick.delete()
+        array.remove(levelBoxes, i)
+        array.remove(levelSides, i)
+        array.remove(levelHits, i)
+        array.remove(levelWeights, i)
+        array.remove(levelFrozen, i)
+        array.remove(levelLeftBar, i)
+        array.remove(levelLeftTime, i)
+        array.remove(levelTop, i)
+        array.remove(levelBottom, i)
+        array.remove(levelRightTime, i)
+        array.remove(levelWicks, i)
+        continue
+
+    midPrice = (topPrice + bottomPrice) * 0.5
+    priceHit = high >= midPrice and low <= midPrice
+
+    if priceHit and not array.get(levelHits, i)
+        if keepTouched
+            array.set(levelHits, i, true)
+            array.set(levelFrozen, i, true)
+            array.set(levelRightTime, i, time)
+            currentBox.set_right(time)
+            if not na(currentWick)
+                currentWick.set_x1(time)
+                currentWick.set_x2(time)
+        else
+            currentBox.delete()
+            if not na(currentWick)
+                currentWick.delete()
+            array.remove(levelBoxes, i)
+            array.remove(levelSides, i)
+            array.remove(levelHits, i)
+            array.remove(levelWeights, i)
+            array.remove(levelFrozen, i)
+            array.remove(levelLeftBar, i)
+            array.remove(levelLeftTime, i)
+            array.remove(levelTop, i)
+            array.remove(levelBottom, i)
+            array.remove(levelRightTime, i)
+            array.remove(levelWicks, i)
+            continue
+
+    side = array.get(levelSides, i)
+    weight = array.get(levelWeights, i)
+    boxColor = getGradientColor(weight, side, weightMin, weightMax)
+    isHit = array.get(levelHits, i)
+
+    touchedTransp = 100 - touchedTransparency
+    fadedColor = color.new(boxColor, touchedTransp)
+    currentBox.set_border_color(isHit ? fadedColor : na)
+    currentBox.set_bgcolor(isHit ? fadedColor : boxColor)
+
+    if not na(currentWick)
+        currentWick.set_color(isHit ? fadedColor : boxColor)
+
+    i += 1
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// MULTI TUNEL DE VIENTO - HEATMAP DE VOLUMEN DE FONDO, REPETIDO HACIA ATRÁS
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+var box[] cajasViento = array.new_box()
+var box[] bordesViento = array.new_box()
+var label lblClampViento = na
+
+if mostrarViento and barstate.islast
+    if array.size(cajasViento) > 0
+        for i2 = 0 to array.size(cajasViento) - 1
+            box.delete(array.get(cajasViento, i2))
+        array.clear(cajasViento)
+
+    if array.size(bordesViento) > 0
+        for i2 = 0 to array.size(bordesViento) - 1
+            box.delete(array.get(bordesViento, i2))
+        array.clear(bordesViento)
+
+    if not na(lblClampViento)
+        lblClampViento.delete()
+
+    // Presupuesto de boxes: tope duro de TradingView es 500, compartido con las zonas de liquidación.
+    // Se reserva margen y se clampea la cantidad real de túneles según boxes disponibles.
+    presupuestoTuneles = 400
+    boxesPorTunel = filasViento + (mostrarBordeViento ? 1 : 0)
+    maxTunelesPorBoxes = math.max(1, int(presupuestoTuneles / boxesPorTunel))
+
+    // Límite de historial referenciable hacia atrás (max_bars_back=5000, se deja margen de seguridad)
+    historialDisponible = 4500
+    maxTunelesPorHistorial = math.max(1, int(historialDisponible / lookbackViento))
+
+    tunelesReales = math.min(numTuneles, math.min(maxTunelesPorBoxes, maxTunelesPorHistorial))
+
+    for m = 0 to tunelesReales - 1
+        offsetTunel = m * lookbackViento
+
+        maxAltoViento = high[offsetTunel]
+        minBajoViento = low[offsetTunel]
+        for j = 0 to lookbackViento - 1
+            if high[offsetTunel + j] > maxAltoViento
+                maxAltoViento := high[offsetTunel + j]
+            if low[offsetTunel + j] < minBajoViento
+                minBajoViento := low[offsetTunel + j]
+
+        altoFilaViento = (maxAltoViento - minBajoViento) / filasViento
+
+        volPorFilaViento = array.new_float(filasViento, 0.0)
+        for j = 0 to lookbackViento - 1
+            precioMedioViento = (high[offsetTunel + j] + low[offsetTunel + j]) / 2
+            indiceFilaViento = int((precioMedioViento - minBajoViento) / altoFilaViento)
+            if indiceFilaViento >= filasViento
+                indiceFilaViento := filasViento - 1
+            if indiceFilaViento < 0
+                indiceFilaViento := 0
+            valorActualViento = array.get(volPorFilaViento, indiceFilaViento)
+            array.set(volPorFilaViento, indiceFilaViento, valorActualViento + finalVolume[offsetTunel + j])
+
+        volMaxViento = array.max(volPorFilaViento)
+
+        xDerViento = bar_index - margenVela - offsetTunel
+        xIzqViento = xDerViento - lookbackViento
+
+        for i3 = 0 to filasViento - 1
+            volFilaViento = array.get(volPorFilaViento, i3)
+            intensidadViento = volMaxViento > 0 ? volFilaViento / volMaxViento : 0.0
+
+            colorFinalViento = intensidadViento < 0.5 ?
+                 color.from_gradient(intensidadViento, 0.0, 0.5, c_cold, c_mid) :
+                 color.from_gradient(intensidadViento, 0.5, 1.0, c_mid,  c_hot)
+
+            transparenciaFilaViento = int(transpFriaViento - intensidadViento * (transpFriaViento - transpCalienteViento))
+            colorConAlfaViento = color.new(colorFinalViento, transparenciaFilaViento)
+
+            binBajoViento = minBajoViento + i3 * altoFilaViento
+            binAltoViento = binBajoViento + altoFilaViento
+
+            nuevaCajaViento = box.new(left=xIzqViento, right=xDerViento, top=binAltoViento, bottom=binBajoViento,
+                 border_color=na, bgcolor=colorConAlfaViento, xloc=xloc.bar_index)
+            array.push(cajasViento, nuevaCajaViento)
+
+        if mostrarBordeViento
+            nuevoBordeViento = box.new(left=xIzqViento, right=xDerViento, top=maxAltoViento, bottom=minBajoViento,
+                 border_color=colorBordeViento, border_width=anchoBordeViento, bgcolor=na, xloc=xloc.bar_index)
+            array.push(bordesViento, nuevoBordeViento)
+
+    if tunelesReales < numTuneles
+        motivo = maxTunelesPorBoxes < maxTunelesPorHistorial ? "límite de boxes" : "límite de historial"
+        lblClampViento := label.new(bar_index, high * 1.02,
+             "Túneles limitados a " + str.tostring(tunelesReales) + " de " + str.tostring(numTuneles) + " (" + motivo + ") - bajá 'Filas' o 'Barras por Túnel'",
+             color=color.new(color.orange, 70), style=label.style_label_down, textcolor=color.white, size=size.small)
