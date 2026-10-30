@@ -1,0 +1,122 @@
+//@version=6
+indicator("Niveles de Pivote Adaptativo", overlay = true, max_lines_count = 500)
+
+// --------------------------------------------------------------------------------------------------------------------}
+// ENTRADAS DEL USUARIO
+// --------------------------------------------------------------------------------------------------------------------{
+
+longitud = input.int(5)
+nivelesActivos = input.bool(true, "Activos", inline = "c")
+nivelesCruzados = input.bool(true, "Cruzados", inline = "c")
+
+colorSube = input.color(color.rgb(36, 224, 133), "", inline = "color")
+colorBaja = input.color(color.rgb(230, 36, 165), "", inline = "color")
+
+// Convierte 1, 2, 3... en A, B, C... (si pasa de 26, muestra el número)
+letra(int n) =>
+    n >= 1 and n <= 26 ? str.substring("ABCDEFGHIJKLMNOPQRSTUVWXYZ", n - 1, n) : str.tostring(n)
+
+// Paleta de colores para las letras (se repite en ciclo)
+var paleta = array.from(color.red, color.orange, color.yellow, color.lime, color.aqua, color.blue, color.purple, color.fuchsia)
+
+colorLetra(int n) =>
+    paleta.get((n - 1) % paleta.size())
+
+type nivel
+    line l
+    bool esInferior
+    label contador
+
+var pivotes = array.new<float>()
+var niveles = array.new<nivel>()
+
+activos = 0
+var inicio = 0
+
+// --------------------------------------------------------------------------------------------------------------------}
+// CALCULOS DEL INDICADOR
+// --------------------------------------------------------------------------------------------------------------------{
+
+pivAlto = ta.pivothigh(longitud, longitud)
+pivBajo = ta.pivotlow(longitud, longitud)
+
+if not na(pivAlto)
+    l = line.new(bar_index-longitud, pivAlto, bar_index, pivAlto)
+    contador = label.new(bar_index, pivAlto, "", color = color(na), style = label.style_label_left)
+
+    pivotes.push(pivAlto)
+    niveles.push(nivel.new(l, false, contador))
+
+if not na(pivBajo)
+    l = line.new(bar_index-longitud, pivBajo, bar_index, pivBajo)
+    contador = label.new(bar_index, pivBajo, "", color = color(na), style = label.style_label_left)
+
+    pivotes.push(pivBajo)
+    niveles.push(nivel.new(l, true, contador))
+
+if pivotes.size() > 10
+    pivotes.shift()
+
+// Cálculo interno (no se dibuja): se usa para colorear y reiniciar los niveles
+lineaTendencia = pivotes.avg()
+
+tendenciaAlza = low  >= lineaTendencia
+tendenciaBaja = high <= lineaTendencia
+colorT = tendenciaAlza ? colorSube : tendenciaBaja ? colorBaja : color.gray
+
+enAlza = colorT == colorSube or colorT == color.gray and colorT[1] == colorSube and colorT[2] == colorSube
+enBaja = colorT == colorBaja or colorT == color.gray and colorT[1] == colorBaja and colorT[2] == colorBaja
+
+cambioAlza = ta.change(enAlza)
+cambioBaja = ta.change(enBaja)
+
+cambioTendencia = cambioAlza or cambioBaja
+
+if cambioTendencia
+    inicio := bar_index
+
+// --------------------------------------------------------------------------------------------------------------------}
+// VISUALIZACION
+// --------------------------------------------------------------------------------------------------------------------{
+
+if not cambioTendencia
+    for i in niveles
+
+        if inicio > i.l.get_x2()
+
+            i.l.delete()
+            i.contador.delete()
+
+            niveles.remove(niveles.indexof(i))
+
+        else
+
+            activos += 1
+
+            i.l.set_x2(bar_index)
+            i.l.set_color(color.new(colorT, 100))
+
+            if nivelesActivos
+
+                i.contador.set_xy(bar_index, i.l.get_y1())
+
+                i.l.set_color(colorT)
+                i.l.set_style(line.style_dashed)
+
+                i.contador.set_text(letra(activos))
+                i.contador.set_textcolor(colorLetra(activos))
+
+            if i.esInferior
+                if low < i.l.get_y1()
+                    i.contador.delete()
+
+                    i.l.set_color(color.new(colorT, nivelesCruzados ? 50 : 100))
+                    i.l.set_style(line.style_dotted)
+                    niveles.remove(niveles.indexof(i))
+
+            else
+                if high > i.l.get_y1()
+                    i.contador.delete()
+                    i.l.set_color(color.new(colorT, nivelesCruzados ? 50 : 100))
+                    i.l.set_style(line.style_dotted)
+                    niveles.remove(niveles.indexof(i))
