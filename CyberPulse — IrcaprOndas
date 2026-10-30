@@ -1,0 +1,95 @@
+// This Pine Script® code is subject to the terms of the Mozilla Public License 2.0 at https://mozilla.org/MPL/2.0/
+// © irca-pro
+
+//@version=6
+indicator("CyberPulse — IrcaprOndas (Todas las MAs)", shorttitle="CP IrcaprOndas", overlay=true)
+
+// --- ENTRADAS ---
+tipoMA      = input.string("SSMA", "Tipo de Media Móvil", options=[
+  "SMA", "EMA", "WMA", "RMA", "DEMA", "TEMA", 
+  "HMA", "VWMA", "KAMA", "ALMA", "ZLEMA", "SMMA", "LSMA", "SSMA"
+  ])
+srcInput    = input.source(close, "Fuente de Precio")
+lonInicial  = input.int(4, "Longitud Inicial", minval=1)
+incremento  = input.int(2, "Incremento entre líneas", minval=1)
+grisColor   = color.rgb(255, 255, 255, 90)
+
+// --- ESTADO POR INSTANCIA (evita que KAMA/SSMA compartan estado entre las 50 longitudes) ---
+var int N_LINEAS      = 50
+var float[] kamaState = array.new_float(N_LINEAS, na)
+var float[] ssmaPrev1 = array.new_float(N_LINEAS, na)
+var float[] ssmaPrev2 = array.new_float(N_LINEAS, na)
+
+// --- FUNCIONES AUXILIARES DE CÁLCULO ---
+f_dema(src, len) => 
+    e1 = ta.ema(src, len)
+    2 * e1 - ta.ema(e1, len)
+
+f_tema(src, len) => 
+    e1 = ta.ema(src, len)
+    e2 = ta.ema(e1, len)
+    3 * (e1 - e2) + ta.ema(e2, len)
+
+f_zlema(src, len) =>
+    lag = math.floor((len - 1) / 2)
+    src_lag = src - nz(src[lag], src)
+    ta.ema(src + src_lag, len)
+
+f_kama(src, len, idx) =>
+    change = math.abs(src - nz(src[len], src))
+    volatility = math.sum(math.abs(src - nz(src[1], src)), len)
+    er = volatility != 0 ? change / volatility : 0.0
+    fastSC = 2.0 / (2 + 1)
+    slowSC = 2.0 / (30 + 1)
+    sc = math.pow(er * (fastSC - slowSC) + slowSC, 2)
+    prev = array.get(kamaState, idx)
+    base = na(prev) ? src : prev
+    kama = base + sc * (src - base)
+    array.set(kamaState, idx, kama)
+    kama
+
+f_ssma(src, len, idx) =>
+    arg = math.sqrt(2) * math.pi / len
+    a1 = math.exp(-arg)
+    b1 = 2 * a1 * math.cos(arg)
+    c2 = b1
+    c3 = -a1 * a1
+    c1 = 1 - c2 - c3
+    p1 = array.get(ssmaPrev1, idx)
+    p2 = array.get(ssmaPrev2, idx)
+    prev1 = na(p1) ? src : p1
+    prev2 = na(p2) ? src : p2
+    ss = c1 * (src + nz(src[1], src)) / 2 + c2 * prev1 + c3 * prev2
+    array.set(ssmaPrev2, idx, prev1)
+    array.set(ssmaPrev1, idx, ss)
+    ss
+
+// --- CALCULADORA MA GENERAL ---
+f_calc(len, idx) =>
+    switch tipoMA
+        "EMA"   => ta.ema(srcInput, len)
+        "WMA"   => ta.wma(srcInput, len)
+        "RMA"   => ta.rma(srcInput, len)
+        "DEMA"  => f_dema(srcInput, len)
+        "TEMA"  => f_tema(srcInput, len)
+        "HMA"   => ta.hma(srcInput, len)
+        "VWMA"  => ta.vwma(srcInput, len)
+        "KAMA"  => f_kama(srcInput, len, idx)
+        "ALMA"  => ta.alma(srcInput, len, 0.85, 6)
+        "ZLEMA" => f_zlema(srcInput, len)
+        "SMMA"  => ta.rma(srcInput, len)
+        "LSMA"  => ta.linreg(srcInput, len, 0)
+        "SSMA"  => f_ssma(srcInput, len, idx)
+        => ta.sma(srcInput, len)
+
+// --- DIBUJO DE LA CINTA (idx fijo 0-49, longitud = lonInicial + idx*incremento) ---
+plot(f_calc(lonInicial+0*incremento,0),  color=grisColor, editable=false), plot(f_calc(lonInicial+1*incremento,1),  color=grisColor, editable=false), plot(f_calc(lonInicial+2*incremento,2),  color=grisColor, editable=false), plot(f_calc(lonInicial+3*incremento,3),  color=grisColor, editable=false), plot(f_calc(lonInicial+4*incremento,4),  color=grisColor, editable=false)
+plot(f_calc(lonInicial+5*incremento,5),  color=grisColor, editable=false), plot(f_calc(lonInicial+6*incremento,6),  color=grisColor, editable=false), plot(f_calc(lonInicial+7*incremento,7),  color=grisColor, editable=false), plot(f_calc(lonInicial+8*incremento,8),  color=grisColor, editable=false), plot(f_calc(lonInicial+9*incremento,9),  color=grisColor, editable=false)
+plot(f_calc(lonInicial+10*incremento,10),color=grisColor, editable=false), plot(f_calc(lonInicial+11*incremento,11),color=grisColor, editable=false), plot(f_calc(lonInicial+12*incremento,12),color=grisColor, editable=false), plot(f_calc(lonInicial+13*incremento,13),color=grisColor, editable=false), plot(f_calc(lonInicial+14*incremento,14),color=grisColor, editable=false)
+plot(f_calc(lonInicial+15*incremento,15),color=grisColor, editable=false), plot(f_calc(lonInicial+16*incremento,16),color=grisColor, editable=false), plot(f_calc(lonInicial+17*incremento,17),color=grisColor, editable=false), plot(f_calc(lonInicial+18*incremento,18),color=grisColor, editable=false), plot(f_calc(lonInicial+19*incremento,19),color=grisColor, editable=false)
+plot(f_calc(lonInicial+20*incremento,20),color=grisColor, editable=false), plot(f_calc(lonInicial+21*incremento,21),color=grisColor, editable=false), plot(f_calc(lonInicial+22*incremento,22),color=grisColor, editable=false), plot(f_calc(lonInicial+23*incremento,23),color=grisColor, editable=false), plot(f_calc(lonInicial+24*incremento,24),color=grisColor, editable=false)
+plot(f_calc(lonInicial+25*incremento,25),color=grisColor, editable=false), plot(f_calc(lonInicial+26*incremento,26),color=grisColor, editable=false), plot(f_calc(lonInicial+27*incremento,27),color=grisColor, editable=false), plot(f_calc(lonInicial+28*incremento,28),color=grisColor, editable=false), plot(f_calc(lonInicial+29*incremento,29),color=grisColor, editable=false)
+plot(f_calc(lonInicial+30*incremento,30),color=grisColor, editable=false), plot(f_calc(lonInicial+31*incremento,31),color=grisColor, editable=false), plot(f_calc(lonInicial+32*incremento,32),color=grisColor, editable=false), plot(f_calc(lonInicial+33*incremento,33),color=grisColor, editable=false), plot(f_calc(lonInicial+34*incremento,34),color=grisColor, editable=false)
+plot(f_calc(lonInicial+35*incremento,35),color=grisColor, editable=false), plot(f_calc(lonInicial+36*incremento,36),color=grisColor, editable=false), plot(f_calc(lonInicial+37*incremento,37),color=grisColor, editable=false), plot(f_calc(lonInicial+38*incremento,38),color=grisColor, editable=false), plot(f_calc(lonInicial+39*incremento,39),color=grisColor, editable=false)
+plot(f_calc(lonInicial+40*incremento,40),color=grisColor, editable=false), plot(f_calc(lonInicial+41*incremento,41),color=grisColor, editable=false), plot(f_calc(lonInicial+42*incremento,42),color=grisColor, editable=false), plot(f_calc(lonInicial+43*incremento,43),color=grisColor, editable=false), plot(f_calc(lonInicial+44*incremento,44),color=grisColor, editable=false)
+plot(f_calc(lonInicial+45*incremento,45),color=grisColor, editable=false), plot(f_calc(lonInicial+46*incremento,46),color=grisColor, editable=false), plot(f_calc(lonInicial+47*incremento,47),color=grisColor, editable=false), plot(f_calc(lonInicial+48*incremento,48),color=grisColor, editable=false), plot(f_calc(lonInicial+49*incremento,49),color=grisColor, editable=false)
