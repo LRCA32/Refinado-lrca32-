@@ -1,0 +1,156 @@
+//@version=6
+indicator("CyberPulse Market Hours inferior", overlay=false, max_boxes_count=500, max_labels_count=500, max_lines_count=50)
+
+// ==========================================================
+// 1. INPUTS GENERALES
+// ==========================================================
+groupGen   = "General"
+tzInput    = input.string("GMT-3", "Zona horaria", options=["GMT-5","GMT-4","GMT-3"], group=groupGen)
+keepN      = input.int(20, "Histórico a mantener (cajas por sesión)", minval=1, group=groupGen)
+showNow    = input.bool(true, "Mostrar línea de hora actual", group=groupGen)
+nowColor   = input.color(color.rgb(0, 217, 255, 60), "Color línea actual", group=groupGen)
+
+// ==========================================================
+// 2. SESIONES
+// ==========================================================
+groupS1    = "Sesión 1 – Londres"
+s1_show    = input.bool(true, "Mostrar", group=groupS1, inline="s1")
+s1_sess    = input.session("0400-1300", "Horario", group=groupS1, inline="s1")
+s1_name    = input.string("London", "Etiqueta", group=groupS1, inline="s1n")
+s1_color   = input.color(color.new(#2962FF, 0), "Color", group=groupS1, inline="s1n")
+
+groupS2    = "Sesión 2 – Nueva York"
+s2_show    = input.bool(true, "Mostrar", group=groupS2, inline="s2")
+s2_sess    = input.session("0900-1800", "Horario", group=groupS2, inline="s2")
+s2_name    = input.string("New York", "Etiqueta", group=groupS2, inline="s2n")
+s2_color   = input.color(color.new(#3CB371, 0), "Color", group=groupS2, inline="s2n")
+
+groupS3    = "Sesión 3 – Tokio"
+s3_show    = input.bool(true, "Mostrar", group=groupS3, inline="s3")
+s3_sess    = input.session("2100-0600", "Horario", group=groupS3, inline="s3")
+s3_name    = input.string("Tokyo", "Etiqueta", group=groupS3, inline="s3n")
+s3_color   = input.color(color.new(#6d0cbd, 0), "Color", group=groupS3, inline="s3n")
+
+groupS4    = "Sesión 4 – Sydney"
+s4_show    = input.bool(true, "Mostrar", group=groupS4, inline="s4")
+s4_sess    = input.session("1700-0200", "Horario", group=groupS4, inline="s4")
+s4_name    = input.string("Sydney", "Etiqueta", group=groupS4, inline="s4n")
+s4_color   = input.color(color.new(#FF9800, 0), "Color", group=groupS4, inline="s4n")
+
+// ==========================================================
+// 3. ESTILO DE BARRAS (sin bordes)
+// ==========================================================
+groupSty    = "Estilo barras"
+bgAlpha     = input.int(15, "Transparencia fondo (0-100)", minval=0, maxval=100, group=groupSty)
+altoBarra   = input.float(0.30, "Alto de barra (0.1-0.45)", minval=0.1, maxval=0.45, step=0.05, group=groupSty)
+
+// ==========================================================
+// 4. ESTILO DE TEXTO
+// ==========================================================
+groupLbl   = "Estilo texto"
+lblSizeOpt = input.string("small", "Tamaño", options=["tiny","small","normal","large","huge"], group=groupLbl)
+putLabel   = input.bool(true, "Mostrar etiqueta de estado", group=groupLbl)
+txtColor   = input.color(color.white, "Color texto", group=groupLbl)
+
+// ==========================================================
+// 5. HELPERS
+// ==========================================================
+toSize(s) =>
+    switch s
+        "tiny"   => size.tiny
+        "small"  => size.small
+        "normal" => size.normal
+        "large"  => size.large
+        "huge"   => size.huge
+
+// ==========================================================
+// 6. FUNCION DE DIBUJO (una fila fija por sesion)
+// ==========================================================
+f_draw_session(bool show, string sess, string name, color col, string tz, int keep, float fila, array<box> boxes, array<label> labels) =>
+    var box   b    = na
+    var label l    = na
+    var bool  isIn = false
+
+    sessNow = time(timeframe.period, sess, tz)
+    active  = show and not na(sessNow)
+    started = active and na(sessNow[1])
+    ended   = (not active) and not na(sessNow[1])
+
+    topY    = fila + altoBarra
+    botY    = fila - altoBarra
+    estado  = str.upper(name) + " SESSION "
+
+    // INICIO
+    if started
+        isIn := true
+        b := box.new(bar_index, topY, bar_index, botY,
+                  border_color = na,
+                  border_width = 0,
+                  bgcolor      = color.new(col, bgAlpha))
+        array.push(boxes, b)
+        while array.size(boxes) > keep
+            box.delete(array.shift(boxes))
+
+        if putLabel
+            l := label.new(bar_index, fila, estado + "OPEN",
+                      style     = label.style_label_right,
+                      yloc      = yloc.price,
+                      color     = color.new(color.gray, 100),
+                      textcolor = txtColor,
+                      textalign = text.align_right,
+                      size      = toSize(lblSizeOpt))
+            array.push(labels, l)
+            while array.size(labels) > keep
+                label.delete(array.shift(labels))
+
+    // ACTUALIZACION (texto pegado al borde derecho)
+    if active and isIn
+        box.set_right(b, bar_index)
+        if putLabel and not na(l)
+            label.set_x(l, bar_index)
+
+    // FIN
+    if ended and isIn
+        isIn := false
+        box.set_right(b, bar_index - 1)
+        if putLabel and not na(l)
+            label.set_x(l, bar_index - 1)
+            label.set_text(l, estado + "CLOSED")
+
+// ==========================================================
+// 7. ALMACENAMIENTO POR SESION
+// ==========================================================
+var box[]   s1_boxes  = array.new<box>()
+var label[] s1_labels = array.new<label>()
+var box[]   s2_boxes  = array.new<box>()
+var label[] s2_labels = array.new<label>()
+var box[]   s3_boxes  = array.new<box>()
+var label[] s3_labels = array.new<label>()
+var box[]   s4_boxes  = array.new<box>()
+var label[] s4_labels = array.new<label>()
+
+// ==========================================================
+// 8. ESCALA DEL PANEL Y SEPARADORES
+// ==========================================================
+// Filas: Sydney = 4, Tokio = 3, Londres = 2, Nueva York = 1
+plot(0, color=color.new(color.white, 100), editable=false)
+plot(5, color=color.new(color.white, 100), editable=false)
+hline(1.5, color=color.new(color.gray, 70), linestyle=hline.style_dotted, editable=false)
+hline(2.5, color=color.new(color.gray, 70), linestyle=hline.style_dotted, editable=false)
+hline(3.5, color=color.new(color.gray, 70), linestyle=hline.style_dotted, editable=false)
+
+// ==========================================================
+// 9. RENDER
+// ==========================================================
+f_draw_session(s4_show, s4_sess, s4_name, s4_color, tzInput, keepN, 4.0, s4_boxes, s4_labels)
+f_draw_session(s3_show, s3_sess, s3_name, s3_color, tzInput, keepN, 3.0, s3_boxes, s3_labels)
+f_draw_session(s1_show, s1_sess, s1_name, s1_color, tzInput, keepN, 2.0, s1_boxes, s1_labels)
+f_draw_session(s2_show, s2_sess, s2_name, s2_color, tzInput, keepN, 1.0, s2_boxes, s2_labels)
+
+// ==========================================================
+// 10. LINEA DE HORA ACTUAL
+// ==========================================================
+var line lineaAhora = na
+if showNow and barstate.islast
+    line.delete(lineaAhora)
+    lineaAhora := line.new(bar_index, 0, bar_index, 5, color=nowColor, width=2, extend=extend.both)
